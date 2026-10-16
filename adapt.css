@@ -107,3 +107,17 @@
 .comparison-screenshot img{display:block;width:100%;max-width:100%;height:auto}
 .comparison-screenshot figcaption{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6}
 @media(max-width:600px){.comparison-grid.has-images{grid-template-columns:minmax(0,1fr);gap:26px}}
+
+/* Card rows use the full reading width in narrower report windows. */
+@media(max-width:1100px){
+  .works-table tr{grid-template-columns:minmax(0,1fr)}
+  .works-table td{grid-column:1/-1}
+}
+.snapshot-positions .current.pending-measurement{background:#f5f6fa;color:var(--muted)}
+.rank-date-pending{display:block;margin-top:7px;font-size:12px;font-weight:400}
+@media(max-width:600px){.snapshot-positions .rank-missing{font-size:11px}}
+@media(max-width:360px){
+  .snapshot-positions .query-col{width:40%}
+  .snapshot-positions .rank-col{width:calc(60% / var(--visible-rank-columns))}
+  .snapshot-positions thead th{font-size:11px;padding-left:2px;padding-right:2px}
+}

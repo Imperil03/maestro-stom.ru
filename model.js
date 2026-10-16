@@ -38,6 +38,21 @@
     return JSON.stringify(before.engines?.[engine] ?? null) === JSON.stringify(after.engines?.[engine] ?? null);
   }
   function rankingsView(rankings) {
+    if (rankings?.pending && !rankings.after) {
+      const {start,before}=rankings, reference=before||start;
+      if (!reference) return null;
+      const initial=new Map((start?.rows||[]).map(r=>[r.id,r]));
+      const previous=new Map((before?.rows||[]).map(r=>[r.id,r]));
+      const rows=reference.rows.map(r=>{
+        const row={id:r.id,query:r.query,direction:r.direction||'',isNew:false,removed:false};
+        for(const engine of ENGINES){
+          const first=initial.get(r.id);
+          row[engine]={start:first&&normalize(first.query)===normalize(r.query)&&sameSettings(start,reference,engine)?first[engine]:undefined,before:previous.get(r.id)?.[engine],after:undefined,change:{kind:'no_data',amount:null}};
+        }
+        return row;
+      });
+      return {start,before,after:null,rows,stats:null,metaMatch:true,pending:true,notes:rankings.notes||[]};
+    }
     if (!rankings?.after) return null;
     const {start, before, after} = rankings;
     const matches = Object.fromEntries(ENGINES.map(e => [e, sameSettings(before, after, e)]));
@@ -70,7 +85,7 @@
         top3:{before:comparable ? count('before',3) : null, after:count('after',3)},
         top10:{before:comparable ? count('before',10) : null, after:count('after',10)}};
     }
-    return {start, before, after, rows, stats, metaMatch:ENGINES.every(e => matches[e])};
+    return {start, before, after, rows, stats, metaMatch:ENGINES.every(e => matches[e]),pending:false,notes:rankings.notes||[]};
   }
   function filterRows(rows, {search = '', direction = '', trend = 'all'} = {}) {
     const term = normalize(search).replaceAll('ё', 'е');
@@ -112,8 +127,11 @@
         }
       }
       if (report.rankings) {
-        check(!!report.rankings.after, `${label}: нет текущего среза.`);
-        check(report.rankings.after?.date?.slice(0,7) === label, `${label}: срез относится к другому месяцу.`);
+        const pending=report.rankings.pending===true;
+        check(pending ? report.rankings.after===null && !!(report.rankings.before||report.rankings.start) : !!report.rankings.after, `${label}: нет текущего среза или явно зарезервированного столбца.`);
+        if(pending)check(report.status==='in_progress',`${label}: ожидающий замер нельзя выдавать за завершённый отчёт.`);
+        if(report.rankings.after)check(report.rankings.after.date?.slice(0,7) === label, `${label}: срез относится к другому месяцу.`);
+        if(own(report.rankings,'notes'))check(Array.isArray(report.rankings.notes)&&report.rankings.notes.every(n=>typeof n==='string'),`${label}: неверные пояснения замеров.`);
         for (const snapshot of [report.rankings.start, report.rankings.before, report.rankings.after].filter(Boolean)) {
           check(validDate(snapshot.date) && snapshot.region && snapshot.device && snapshot.sourceKey, `${label}: неполные настройки замера.`);
           check(Array.isArray(snapshot.rows) && new Set(snapshot.rows.map(r => r.id)).size === snapshot.rows.length, `${label}: неполные или повторные запросы.`);
@@ -122,8 +140,8 @@
             for (const engine of ENGINES) if (own(row, engine)) check(row[engine] === null || (Number.isInteger(row[engine]) && row[engine] > 0 && row[engine] <= 1000), `${label}: неверная позиция.`);
           }
         }
-        if (report.rankings.before) check(report.rankings.before.date < report.rankings.after.date, `${label}: неверный порядок дат.`);
-        if (report.rankings.start) check(report.rankings.start.date <= (report.rankings.before?.date || report.rankings.after.date), `${label}: первый замер позже отчётного периода.`);
+        if (report.rankings.before && report.rankings.after) check(report.rankings.before.date < report.rankings.after.date, `${label}: неверный порядок дат.`);
+        if (report.rankings.start) check(report.rankings.start.date <= (report.rankings.before?.date || report.rankings.after?.date || report.rankings.start.date), `${label}: первый замер позже отчётного периода.`);
       }
       if (report.traffic) check(Number.isInteger(report.traffic.visits) && report.traffic.visits >= 0, `${label}: неверное число визитов.`);
       check(Array.isArray(report.works), `${label}: отсутствует список работ.`);
