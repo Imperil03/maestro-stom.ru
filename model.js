@@ -149,12 +149,14 @@
       for (const work of report.works || []) {
         check(['id','title','summary','result'].every(k => typeof work[k] === 'string' && work[k].trim()), `${label}: неполная работа.`);
         check(work.why === null || typeof work.why === 'string', `${label}: неверное пояснение работы.`);
+        if (own(work,'retainedEvidence')) check(Array.isArray(work.retainedEvidence) && work.retainedEvidence.every(url => typeof url === 'string' && url.startsWith('evidence/') && safeHref(url) === url), `${label}: неверный путь сохранённого подтверждения.`);
         for (const section of work.sections || []) {
           const validSection = !!section && typeof section === 'object' && !Array.isArray(section);
           check(validSection, `${label}: неверный раздел работы.`);
           if (!validSection) continue;
           if (own(section,'title')) check(typeof section.title === 'string', `${label}: неверный заголовок раздела.`);
           if (own(section,'afterText')) check(typeof section.afterText === 'string', `${label}: неверный текст после таблицы.`);
+          if (own(section,'note')) check(typeof section.note === 'string', `${label}: неверное примечание раздела.`);
           if (own(section,'table')) {
             const table = section.table;
             const validColumns = Array.isArray(table?.columns) && table.columns.length > 0 && table.columns.every(column => typeof column === 'string' && column.trim());
@@ -165,6 +167,7 @@
           for (const link of section.links || []) check(!!safeHref(link.url), `${label}: небезопасная ссылка.`);
         }
         for (const evidence of work.evidence || []) {
+          if (own(evidence,'text')) check(typeof evidence.text === 'string', `${label}: неверное описание подтверждения.`);
           check(['link','comparison','table'].includes(evidence.type), `${label}: неизвестное подтверждение.`);
           if (evidence.type === 'link') check(!!safeHref(evidence.url), `${label}: небезопасное подтверждение.`);
           if (evidence.type === 'comparison' && (own(evidence,'beforeImage') || own(evidence,'afterImage'))) {

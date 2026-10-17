@@ -53,3 +53,6 @@
 @media print{body{background:white}.report-shell{padding:0;max-width:none}.report-nav,.month-picker,.table-filters,.mobile-engine,.table-footer button{display:none!important}.surface{box-shadow:none;border:1px solid #ddd}.stage{break-inside:avoid}.stage-tasks{grid-template-columns:1fr}.report-footer{padding:24px 0}.detail-dialog[open]{position:static;width:100%;height:auto;box-shadow:none}.drawer-body{overflow:visible}.detail-dialog::backdrop{display:none}.icon-button,.task-affordance{display:none}.stage.selected .stage-card{outline:none}.table-scroll{overflow:visible}.positions-table{min-width:0}}
 
 @media print{.evidence-table{min-width:0}}
+
+.detail-dialog[data-report-view="works"] .detail-section p.section-note{font-size:13px;line-height:1.7;color:var(--muted);margin-top:16px}.evidence-intro{margin-bottom:24px;color:var(--muted)}
+.evidence-table.evidence-compact{min-width:0}.evidence-compact th:not(:first-child),.evidence-compact td:not(:first-child){white-space:nowrap}@media(max-width:600px){.evidence-compact th,.evidence-compact td{padding:14px 8px}}
