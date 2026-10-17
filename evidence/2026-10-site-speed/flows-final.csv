@@ -1,0 +1,45 @@
+﻿Страница;Устройство;Версия;Сценарий;Завершённые ресурсы сайта, байт;Незавершённые запросы сайта;Запросы из кеша;TTFB наблюдаемый, мс;Load наблюдаемый, мс;Достигнут футер;Длинные задачи, шт.;Длинные задачи, мс;Длинные кадры >50 мс;Максимальный промежуток кадров, мс;Карта готова;Горизонтальное переполнение
+Главная;mobile;current;scroll;1449944;0;0;2040,1;13838,1;True;0;0;0;34,8;;False
+Одномоментная имплантация;mobile;current;cross-page-cache;191309;0;13;1517,5;4883,6;;0;;;;;False
+Контакты;mobile;current;cross-page-cache;73819;0;14;1715,2;5088,5;;0;;;;;False
+Цены;mobile;current;cross-page-cache;40558;0;16;902,8;3980,2;;0;;;;;False
+Главная;mobile;candidate;scroll;1403807;0;0;1832,8;13024,3;True;0;0;0;34,9;;False
+Одномоментная имплантация;mobile;candidate;cross-page-cache;89575;0;13;1964,5;5110,1;;0;;;;;False
+Контакты;mobile;candidate;cross-page-cache;73930;0;14;1718,8;4399,2;;0;;;;;False
+Цены;mobile;candidate;cross-page-cache;40628;0;16;1827,9;5478,5;;0;;;;;False
+Главная;desktop;candidate;scroll;1069702;0;0;1845,4;7737,9;True;1;52;1;55,5;1;False
+Одномоментная имплантация;desktop;candidate;cross-page-cache;149992;0;13;1799;4003,4;;0;;;;;False
+Контакты;desktop;candidate;cross-page-cache;19198;0;17;1734,7;3711;;0;;;;;False
+Цены;desktop;candidate;cross-page-cache;40629;0;16;899,7;3715,9;;0;;;;;False
+Главная;desktop;current;scroll;1115755;0;0;973,3;6724,6;True;0;0;0;48,7;1;False
+Одномоментная имплантация;desktop;current;cross-page-cache;191308;0;13;2075,3;4313,5;;0;;;;;False
+Контакты;desktop;current;cross-page-cache;19124;0;17;1919,6;4133,3;;0;;;;;False
+Цены;desktop;current;cross-page-cache;40557;0;16;1791,5;4204,6;;0;;;;;False
+Одномоментная имплантация;mobile;current;scroll;642677;0;0;756,7;9901,4;True;3;509;3;250,1;1;False
+Одномоментная имплантация;mobile;candidate;scroll;540953;0;0;596;10342,8;True;3;513;3;243,1;1;False
+Одномоментная имплантация;desktop;candidate;scroll;606026;0;0;637,6;6274,5;True;0;0;0;48,7;1;False
+Одномоментная имплантация;desktop;current;scroll;647299;0;0;636,8;6197,3;True;0;0;0;48,7;1;False
+Раздел имплантации;mobile;current;scroll;674841;0;0;1813,5;10904;True;3;512;4;271;1;False
+Раздел имплантации;mobile;candidate;scroll;534387;0;0;1844,7;9474,2;True;3;518;3;291,9;1;False
+Раздел имплантации;desktop;candidate;scroll;601750;0;0;1797,2;7253,4;True;1;51;1;55,6;1;False
+Раздел имплантации;desktop;current;scroll;679468;0;0;792,3;6884,7;True;1;64;1;69,4;1;False
+Герметизация фиссур;mobile;current;scroll;992596;0;0;631,7;14007,9;True;3;538;3;305,8;1;False
+Герметизация фиссур;mobile;candidate;scroll;569059;0;0;620,7;7932,1;True;3;587;3;319,5;1;False
+Герметизация фиссур;desktop;candidate;scroll;638377;0;0;1796,9;7275,8;True;0;0;1;55,5;1;False
+Герметизация фиссур;desktop;current;scroll;973674;0;0;676,9;6550,3;True;0;0;0;48,6;1;False
+Врач Воеводенко О. Н.;mobile;current;scroll;895167;0;0;1180,2;11493,6;True;3;511;3;277,9;1;False
+Врач Воеводенко О. Н.;mobile;candidate;scroll;895313;0;0;1825;11630,5;True;3;528;3;298,8;1;False
+Врач Воеводенко О. Н.;desktop;candidate;scroll;899913;0;0;1980,4;8129;True;1;53;1;55,5;1;False
+Врач Воеводенко О. Н.;desktop;current;scroll;899755;0;0;648,8;6533,2;True;1;64;1;69,4;1;False
+Статья об имплантации;mobile;current;scroll;555467;0;0;1560,4;9463,6;True;3;493;3;257,1;1;False
+Статья об имплантации;mobile;candidate;scroll;517561;1;0;909,3;10816,1;True;3;505;3;264,1;1;False
+Статья об имплантации;desktop;candidate;scroll;555623;0;0;2072,9;7733,5;True;0;0;1;55,5;1;False
+Статья об имплантации;desktop;current;scroll;555465;0;0;1741,2;7280,1;True;1;51;1;55,6;1;False
+Цены;mobile;current;scroll;407832;0;0;1992,9;9783,6;True;3;545;4;291,8;1;False
+Цены;mobile;candidate;scroll;407988;0;0;1017,1;8478,5;True;3;560;4;312,6;1;False
+Цены;desktop;candidate;scroll;408019;0;0;905,1;8896,4;True;1;53;1;62,5;1;False
+Цены;desktop;current;scroll;407887;0;0;1832,2;10038;True;1;52;1;55,5;1;False
+Контакты;mobile;current;scroll;386439;0;0;1748,7;14878,8;True;0;0;0;27,8;1;False
+Контакты;mobile;candidate;scroll;386571;0;0;1683,1;15789,1;True;0;0;0;34,7;1;False
+Контакты;desktop;candidate;scroll;386589;0;0;1725,3;15412,2;True;0;0;0;34,7;1;False
+Контакты;desktop;current;scroll;386428;0;0;780,2;14325,5;True;0;0;0;34,7;1;False
