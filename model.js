@@ -56,6 +56,23 @@
   const sameSettings = (before,after,engine) => comparisonSettings(before,after,engine).comparable;
   const withinDepth = (value,depth) => typeof value === 'number' && depth && value > depth ? null : value;
   const displayRank = (value, missingRank = 101) => typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : missingRank;
+  function rankDisplayChange(before, after) {
+    const measured = value => Number.isInteger(value) && value > 0;
+    if (measured(before) && measured(after)) {
+      const delta = before - after;
+      return {kind:delta > 0 ? 'up' : delta < 0 ? 'down' : 'same',amount:Math.abs(delta)};
+    }
+    if (measured(after) && before === null) return {kind:'appeared',amount:null};
+    if (measured(after) && before === undefined) return {kind:'new',amount:null};
+    if (measured(before) && after === null) return {kind:'lost',amount:null};
+    return {kind:'no_data',amount:null};
+  }
+  function rankVisibility(rows, engine, role) {
+    const values = rows.map(row => row[engine]?.[role]);
+    const total = rows.length;
+    const top10 = values.filter(value => Number.isInteger(value) && value >= 1 && value <= 10).length;
+    return {total,top10,percent:total ? top10 / total * 100 : null,measured:values.filter(value => value !== undefined).length};
+  }
   function snapshotCounts(rows) {
     return Object.fromEntries(ENGINES.map(engine => [engine,Object.fromEntries(['start','before','after'].map(side => {
       const values = rows.map(row => row[engine]?.[side]);
@@ -290,5 +307,5 @@
     }
     return errors;
   }
-  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, displayRank, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
+  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, displayRank, rankDisplayChange, rankVisibility, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
 });

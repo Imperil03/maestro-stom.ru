@@ -106,9 +106,15 @@
     return `<section class="rank-scope surface" aria-label="Выборка запросов"><div class="scope-options" role="group" aria-label="Выборка запросов"><button type="button" data-rank-scope="all" aria-pressed="${state.cohort==='all'}">Все запросы</button>${report.rankings.cohorts.map(c=>`<button type="button" data-rank-scope="${esc(c.id)}" aria-pressed="${state.cohort===c.id}">${esc(c.label)}</button>`).join('')}</div></section>`;
   }
   function rankCell(value, archive = false) {
-    if (value === undefined || value === null || value === '' || value === '—' || value === '--') return '<span class="rank-value rank-other" title="101 — условное значение: нет данных или вне проверки">101</span>';
+    if (value === undefined || value === null || value === '' || value === '—' || value === '--') return '<span class="rank-value rank-other rank-placeholder" title="101 — условное значение: нет данных или вне проверки">101</span>';
     const numeric = Number(value), band = numeric > 0 && numeric <= 3 ? 'top3' : numeric <= 10 && numeric > 0 ? 'top10' : numeric <= 30 && numeric > 0 ? 'top30' : 'other';
     return `<span class="rank-value rank-${band}">${archive ? esc(value) : number(value)}</span>`;
+  }
+  function currentRankCell(value, before) {
+    const change=M.rankDisplayChange(before,value);
+    const labels={up:`На ${number(change.amount)} позиций выше`,down:`На ${number(change.amount)} позиций ниже`,appeared:'Появился в выдаче',lost:'Вышел за пределы проверки',new:'Новый запрос'};
+    const badge=change.kind==='up'?`+${number(change.amount)}`:change.kind==='down'?`−${number(change.amount)}`:change.kind==='appeared'?'↑':change.kind==='lost'?'↓':change.kind==='new'?'нов.':'';
+    return `<span class="rank-position-trend rank-trend-${change.kind}">${rankCell(value)}${badge?`<span class="rank-delta" title="${esc(labels[change.kind])}" aria-label="${esc(labels[change.kind])}">${badge}</span>`:''}</span>`;
   }
   function queryTableHTML() {
     if (!report.archive && !view) return '';
@@ -117,19 +123,33 @@
     positionColumns=Object.fromEntries(M.ENGINES.map(engine=>[engine,archive?archive.dates[engine].map((d,i,dates)=>({...d,key:i,role:i===dates.length-1?'after':i===0?'start':'before'})):
       ['start','before','after'].map(role=>{const snapshot=report.rankings[role];return {key:role,role,date:snapshot?.date||null,lookup:new Map((snapshot?.rows||[]).map(row=>[row.id,row]))};})]));
     const counts=Object.fromEntries(M.ENGINES.map(e=>[e,positionColumns[e].length]));
-    const heading=engine=>positionColumns[engine].map((column,i)=>`<th id="rank-${engine}-${column.key}" scope="col" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}"><time datetime="${column.date||''}" aria-label="${dateLabel(column.date)}">${column.date?dateLabel(column.date).replace(/(\d{2}\.\d{2}\.)(\d{4})/,'$1<wbr>$2'):'—'}</time></th>`).join('');
+    const heading=engine=>positionColumns[engine].map((column,i)=>`<th id="rank-${engine}-${column.key}" scope="col" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}"><time datetime="${column.date||''}" aria-label="${dateLabel(column.date)}">${column.date?dateLabel(column.date).replace(/(\d{2}\.\d{2}\.)(\d{4})/,'$1<wbr>$2'):'—'}</time><span class="rank-visibility" data-rank-visibility-engine="${engine}" data-rank-visibility-key="${column.key}"><span class="rank-visibility-range" aria-hidden="true">1–10</span><strong class="rank-visibility-value">—</strong></span></th>`).join('');
     const columns=M.ENGINES.map(engine=>positionColumns[engine].map(()=>`<col class="rank-col engine-${engine}">`).join('')).join('');
-    const legend=`<div class="rank-legend" aria-label="Обозначения позиций"><span><i class="rank-key rank-top3" aria-hidden="true"></i>Топ-3</span><span><i class="rank-key rank-top10" aria-hidden="true"></i>4–10</span><span><i class="rank-key rank-top30" aria-hidden="true"></i>11–30</span><span><i class="rank-key rank-other" aria-hidden="true"></i>101</span></div>`;
+    const legend=archive?`<div class="rank-legend" aria-label="Обозначения позиций"><span><i class="rank-key rank-top3" aria-hidden="true"></i>Топ-3</span><span><i class="rank-key rank-top10" aria-hidden="true"></i>4–10</span><span><i class="rank-key rank-top30" aria-hidden="true"></i>11–30</span><span><i class="rank-key rank-other" aria-hidden="true"></i>101</span></div>`:'';
     return `<section class="queries-card surface"><div class="section-heading"><h2>Позиции запросов</h2></div><div class="table-filters"><div class="filter-field search"><label for="query-search">Найти запрос</label><input id="query-search" type="search" placeholder="Например, стоматология Сургут" value="${esc(state.filters.search)}"></div><div class="filter-field direction"><label for="direction-filter">Направление</label><div class="select-wrap"><select id="direction-filter"><option value="">Все направления</option>${directions.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('')}</select>${icon('chevron')}</div></div>${!archive&&view.before&&!view.pending&&report.rankings?.presentation?.comparison!=='previous_month'?`<div class="filter-field trend"><label for="trend-filter">Динамика</label><div class="select-wrap"><select id="trend-filter">${[['all','Все изменения'],['up','Рост'],['down','Снижение'],['same','Без изменений'],['new','Новые запросы']].map(([v,label])=>`<option value="${v}">${label}</option>`).join('')}</select>${icon('chevron')}</div></div>`:''}</div>${legend}<div class="mobile-engine" role="group" aria-label="Поисковик в таблице"><button type="button" data-engine="yandex" aria-pressed="${state.engine==='yandex'}">Яндекс</button><button type="button" data-engine="google" aria-pressed="${state.engine==='google'}">Google</button></div><div class="table-scroll" id="positions-wrap" data-engine="${state.engine}" role="region" tabindex="0" aria-label="Позиции запросов"><table class="positions-table snapshot-positions" style="--rank-columns:${counts.yandex+counts.google};--yandex-columns:${counts.yandex};--google-columns:${counts.google}"><caption class="sr-only">Позиции запросов за ${esc(M.monthLabel(state.month).toLowerCase())}</caption><colgroup><col class="query-col">${columns}</colgroup><thead><tr><th id="query-heading" rowspan="2" scope="col" class="query-heading">Запрос</th><th id="engine-yandex" colspan="${counts.yandex}" scope="colgroup" class="engine-yandex engine-title engine-start">Яндекс</th><th id="engine-google" colspan="${counts.google}" scope="colgroup" class="engine-google engine-title engine-start">Google</th></tr><tr>${M.ENGINES.map(heading).join('')}</tr></thead><tbody id="query-rows"></tbody></table></div><p id="query-empty" class="query-empty" hidden>Запросы не найдены. Измените поиск или фильтры.</p><div class="table-footer"><span id="query-count" role="status" aria-live="polite"></span><button type="button" class="button-secondary" id="show-more">Показать ещё 25</button></div></section>`;
   }
   function renderQueries() {
     if (!$('query-rows')) return;
     const archive=report.archive,allRows=archive?archive.rows:view.rows;
     const filtered=M.filterRows(allRows,state.filters),visible=filtered.slice(0,state.limit);
+    const headerRows=filtered.map(row=>Object.fromEntries(M.ENGINES.map(engine=>[engine,Object.fromEntries(positionColumns[engine].map(column=>{
+      const value=archive?row[engine][column.key]:column.lookup?.get(row.id)?.[engine];
+      return [column.key,archive&&/^[1-9]\d*$/.test(String(value))?Number(value):value];
+    }))])));
+    for(const engine of M.ENGINES)for(const column of positionColumns[engine]){
+      const metric=M.rankVisibility(headerRows,engine,column.key),element=document.querySelector(`[data-rank-visibility-engine="${engine}"][data-rank-visibility-key="${column.key}"]`);
+      if(!element)continue;
+      element.querySelector('.rank-visibility-value').textContent=metric.percent===null?'—':`${number(Math.round(metric.percent))}%`;
+      element.title=`В топ-10: ${number(metric.top10)} из ${number(metric.total)}`;
+      element.setAttribute('aria-label',element.title);
+      element.dataset.top10=metric.top10;element.dataset.total=metric.total;
+    }
     $('query-rows').innerHTML=visible.map((row,rowIndex)=>`<tr><th id="query-${rowIndex}" scope="row" class="query-name">${esc(row.query)}</th>${M.ENGINES.map(engine=>positionColumns[engine].map((column,i)=>{
       const original=column.lookup?.get(row.id);
       const value=archive?row[engine][column.key]:original?.[engine];
-      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${rankCell(value,!!archive)}</td>`;
+      const beforeColumn=positionColumns[engine].find(c=>c.role==='before');
+      const before=beforeColumn?.lookup?.get(row.id)?.[engine];
+      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${!archive&&column.role==='after'?currentRankCell(value,before):rankCell(value,!!archive)}</td>`;
     }).join('')).join('')}</tr>`).join('');
     $('positions-wrap').hidden=filtered.length===0;$('query-empty').hidden=filtered.length!==0;
     $('query-count').textContent=`Показано: ${visible.length} из ${filtered.length}`;$('show-more').hidden=state.limit>=filtered.length;

@@ -70,6 +70,18 @@
 .snapshot-positions .current .rank-top3{color:var(--rank-top3-ink)}
 .snapshot-positions .current .rank-top10{color:var(--rank-top10-ink)}
 .snapshot-positions .current .rank-top30{color:var(--rank-top30-ink)}
+.snapshot-positions .current .rank-position-trend{display:inline-flex;align-items:baseline;justify-content:center;gap:4px;white-space:nowrap}
+.snapshot-positions .current .rank-position-trend .rank-value{min-width:0;padding:0;color:var(--ink)}
+.snapshot-positions .current .rank-trend-up .rank-value,.snapshot-positions .current .rank-trend-appeared .rank-value{color:var(--positive)}
+.snapshot-positions .current .rank-trend-down .rank-value{color:var(--negative)}
+.snapshot-positions .current .rank-value.rank-placeholder{color:var(--rank-other-ink)}
+.rank-position-trend .rank-delta{font-size:11px;line-height:1.2;font-weight:600;letter-spacing:-.02em;align-self:flex-start;margin-top:2px}
+.rank-trend-up .rank-delta,.rank-trend-appeared .rank-delta{color:var(--positive)}
+.rank-trend-down .rank-delta,.rank-trend-lost .rank-delta{color:var(--negative)}
+.rank-trend-new .rank-delta{color:var(--accent);font-size:10px;font-weight:500}
+.rank-visibility{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:5px;line-height:1.3;color:var(--muted);font-size:10px;font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rank-visibility-range{font-size:9px}
+.rank-visibility-value{font-size:11px;font-weight:600}
 .rank-missing{font-size:12px;color:var(--muted);font-weight:400;line-height:1.4}
 .rank-movement{display:block;margin-top:4px;font-size:12px;line-height:1.4}
 .snapshot-positions .rank-movement .delta{font-size:12px;line-height:1.4}
@@ -93,6 +105,12 @@
   .snapshot-positions .engine-google.engine-start{border-left-width:1px}
   .rank-value{min-width:30px;padding:4px 5px;font-size:15px}
   .snapshot-positions .current .rank-value{font-size:16px}
+  .snapshot-positions .current .rank-position-trend{gap:2px}
+  .rank-position-trend .rank-delta{font-size:10px;margin-top:2px}
+  .rank-trend-new .rank-delta{font-size:9px}
+  .rank-visibility{gap:3px;font-size:9px}
+  .rank-visibility-range{font-size:9px}
+  .rank-visibility-value{font-size:11px}
   .queries-card .mobile-engine button[data-engine][aria-pressed=true]{color:var(--accent);background:var(--rank-group-bg);border-color:#c7c2ee}
   .queries-card .table-scroll-hint{display:none}
 }
