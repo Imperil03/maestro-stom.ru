@@ -33,17 +33,41 @@
     if (after === null) return {kind:'lost', amount:null};
     return {kind:before > after ? 'up' : before < after ? 'down' : 'same', amount:Math.abs(before - after)};
   }
-  function sameSettings(before, after, engine) {
+  function legacySameSettings(before, after, engine) {
     if (!before || !after || before.region !== after.region || before.device !== after.device || before.sourceKey !== after.sourceKey) return false;
     return JSON.stringify(before.engines?.[engine] ?? null) === JSON.stringify(after.engines?.[engine] ?? null);
   }
-  function rankingsView(rankings) {
+  function comparisonSettings(before, after, engine) {
+    const a = before?.engines?.[engine], b = after?.engines?.[engine];
+    const profiled = value => !!value && typeof value.provider === 'string' && ['live','xml'].includes(value.mode) && Number.isInteger(value.depth) && value.depth > 0 && value.rankBasis === 'organic';
+    const oldDepth = Number.isInteger(a?.depth) ? a.depth : null, newDepth = Number.isInteger(b?.depth) ? b.depth : null;
+    const base = {beforeDepth:oldDepth,afterDepth:newDepth,commonDepth:oldDepth && newDepth ? Math.min(oldDepth,newDepth) : null};
+    if (!profiled(a) && !profiled(b)) {
+      const comparable = legacySameSettings(before,after,engine);
+      return {...base,comparable,type:comparable ? 'same_provider' : 'incompatible',providerChanged:false,reason:comparable ? '' : 'Настройки замеров различаются.'};
+    }
+    if (!profiled(a) || !profiled(b)) return {...base,comparable:false,type:'incompatible',providerChanged:false,reason:'Не подтверждён профиль одного из замеров.'};
+    const region = (snapshot,meta) => normalize(meta.region || snapshot.region);
+    const compatible = region(before,a) === region(after,b) && a.device === b.device && normalize(a.language) === normalize(b.language) && a.mode === b.mode && a.rankBasis === b.rankBasis;
+    const providerChanged = a.provider !== b.provider;
+    return {...base,comparable:compatible,type:!compatible ? 'incompatible' : providerChanged ? 'provider_changed' : 'same_provider',providerChanged,
+      reason:!compatible ? 'Различаются регион, устройство, язык или режим выдачи.' : providerChanged ? 'Сменился сервис съёма; сравнение ориентировочное.' : ''};
+  }
+  const sameSettings = (before,after,engine) => comparisonSettings(before,after,engine).comparable;
+  const withinDepth = (value,depth) => typeof value === 'number' && depth && value > depth ? null : value;
+  function rankingsView(rankings, {cohort = 'all'} = {}) {
+    const selected = cohort === 'all' ? null : rankings?.cohorts?.find(c => c.id === cohort);
+    if (cohort !== 'all' && !selected) throw new RangeError('Неизвестная выборка запросов.');
+    const selectedIds = selected ? new Set(selected.queryIds) : null;
+    const scoped = rows => selectedIds ? rows.filter(row => selectedIds.has(row.id)) : rows;
+    const scope = selected ? {id:selected.id,label:selected.label,queryIds:[...selected.queryIds]} : {id:'all',label:'Все запросы'};
+    const history = rankings ? {start:rankings.start || null,before:rankings.before || null} : null;
     if (rankings?.pending && !rankings.after) {
       const {start,before}=rankings, reference=before||start;
       if (!reference) return null;
       const initial=new Map((start?.rows||[]).map(r=>[r.id,r]));
       const previous=new Map((before?.rows||[]).map(r=>[r.id,r]));
-      const rows=reference.rows.map(r=>{
+      const rows=scoped(reference.rows).map(r=>{
         const row={id:r.id,query:r.query,direction:r.direction||'',isNew:false,removed:false};
         for(const engine of ENGINES){
           const first=initial.get(r.id);
@@ -51,15 +75,16 @@
         }
         return row;
       });
-      return {start,before,after:null,rows,stats:null,metaMatch:true,pending:true,notes:rankings.notes||[]};
+      return {start,before,after:null,reference:rankings.reference || null,history,scope,rows,stats:null,metaMatch:true,pending:true,notes:rankings.notes||[]};
     }
     if (!rankings?.after) return null;
-    const {start, before, after} = rankings;
-    const matches = Object.fromEntries(ENGINES.map(e => [e, sameSettings(before, after, e)]));
+    const {start, after} = rankings, before = rankings.reference || rankings.before;
+    const comparisons = Object.fromEntries(ENGINES.map(e => [e,comparisonSettings(before,after,e)]));
+    const matches = Object.fromEntries(ENGINES.map(e => [e,comparisons[e].comparable]));
     const beforeMap = new Map((before?.rows || []).map(r => [r.id, r]));
     const startMap = new Map((start?.rows || []).map(r => [r.id, r]));
     const afterMap = new Map(after.rows.map(r => [r.id, r]));
-    const rows = [...new Set([...afterMap.keys(), ...beforeMap.keys()])].map(id => {
+    const rows = scoped([...new Set([...afterMap.keys(), ...beforeMap.keys()])].map(id => ({id}))).map(({id}) => {
       const old = beforeMap.get(id), current = afterMap.get(id), display = current || old;
       const renamed = !!(old && current && normalize(old.query) !== normalize(current.query));
       const isNew = !!before && (!old || renamed || ENGINES.every(e => !own(old, e)));
@@ -68,7 +93,10 @@
         const previous = renamed ? undefined : old?.[engine];
         const initial = startMap.get(id);
         const initialMatches = initial && normalize(initial.query) === normalize(display.query) && sameSettings(start,after,engine);
-        row[engine] = {start:initialMatches ? initial[engine] : undefined, before:previous, after:current?.[engine], change:rankChange(previous, current?.[engine], matches[engine], isNew)};
+        const commonDepth = comparisons[engine].commonDepth;
+        const compareBefore = withinDepth(previous,commonDepth), compareAfter = withinDepth(current?.[engine],commonDepth);
+        const change = commonDepth && matches[engine] && !isNew && compareBefore === null && compareAfter === null ? {kind:'outside',amount:null} : rankChange(compareBefore,compareAfter,matches[engine],isNew);
+        row[engine] = {start:initialMatches ? initial[engine] : undefined,before:previous,after:current?.[engine],error:Array.isArray(current?.failedEngines) && current.failedEngines.includes(engine),change};
       }
       return row;
     });
@@ -78,14 +106,28 @@
       const currentRows = rows.filter(r => r[engine].after !== undefined);
       const comparable = matches[engine] && comparableRows.length > 0;
       const population = comparable ? comparableRows : currentRows;
-      const count = (side, top) => population.filter(r => typeof r[engine][side] === 'number' && r[engine][side] <= top).length;
-      stats[engine] = {comparable, total:population.length, currentTotal:currentRows.length,
-        newCount:rows.filter(r => r.isNew && r[engine].after !== undefined).length,
-        missingCount:after.rows.length - currentRows.length,
-        top3:{before:comparable ? count('before',3) : null, after:count('after',3)},
-        top10:{before:comparable ? count('before',10) : null, after:count('after',10)}};
+      const count = (items,side,top) => items.filter(r => typeof r[engine][side] === 'number' && r[engine][side] <= top).length;
+      const result = {comparable,total:population.length,pairedTotal:comparableRows.length,currentTotal:currentRows.length,
+        newCount:currentRows.filter(r => r.isNew || r[engine].before === undefined).length,
+        missingCount:scoped(after.rows).length - currentRows.length,
+        errorCount:rows.filter(r => r[engine].error).length,
+        movement:{up:0,down:0,same:0,outside:0}};
+      result.unmeasuredCount = result.missingCount - result.errorCount;
+      for (const top of [3,10,30]) {
+        result['top'+top] = {before:comparable && (!comparisons[engine].beforeDepth || comparisons[engine].beforeDepth >= top) ? count(population,'before',top) : null,
+          after:!comparisons[engine].afterDepth || comparisons[engine].afterDepth >= top ? count(population,'after',top) : null};
+        result['currentTop'+top] = !comparisons[engine].afterDepth || comparisons[engine].afterDepth >= top ? count(currentRows,'after',top) : null;
+      }
+      if (comparable) for (const row of comparableRows) {
+        const kind = row[engine].change.kind;
+        if (['up','appeared'].includes(kind)) result.movement.up++;
+        else if (['down','lost'].includes(kind)) result.movement.down++;
+        else if (kind === 'same') result.movement.same++;
+        else if (kind === 'outside') result.movement.outside++;
+      }
+      stats[engine] = result;
     }
-    return {start, before, after, rows, stats, metaMatch:ENGINES.every(e => matches[e]),pending:false,notes:rankings.notes||[]};
+    return {start,before,after,reference:rankings.reference || null,history,scope,rows,stats,comparisons,metaMatch:ENGINES.every(e => matches[e]),pending:false,notes:rankings.notes||[]};
   }
   function filterRows(rows, {search = '', direction = '', trend = 'all'} = {}) {
     const term = normalize(search).replaceAll('ё', 'е');
@@ -132,18 +174,72 @@
         if(pending)check(report.status==='in_progress',`${label}: ожидающий замер нельзя выдавать за завершённый отчёт.`);
         if(report.rankings.after)check(report.rankings.after.date?.slice(0,7) === label, `${label}: срез относится к другому месяцу.`);
         if(own(report.rankings,'notes'))check(Array.isArray(report.rankings.notes)&&report.rankings.notes.every(n=>typeof n==='string'),`${label}: неверные пояснения замеров.`);
-        for (const snapshot of [report.rankings.start, report.rankings.before, report.rankings.after].filter(Boolean)) {
+        const snapshots = [report.rankings.start,report.rankings.before,report.rankings.reference,report.rankings.after].filter(Boolean);
+        for (const snapshot of snapshots) {
           check(validDate(snapshot.date) && snapshot.region && snapshot.device && snapshot.sourceKey, `${label}: неполные настройки замера.`);
           check(Array.isArray(snapshot.rows) && new Set(snapshot.rows.map(r => r.id)).size === snapshot.rows.length, `${label}: неполные или повторные запросы.`);
+          for (const engine of ENGINES) {
+            const meta = snapshot.engines?.[engine];
+            if (meta && ['provider','mode','depth','rankBasis'].some(k => own(meta,k))) {
+              check(typeof meta.provider === 'string' && meta.provider.trim() && ['live','xml'].includes(meta.mode) && Number.isInteger(meta.depth) && meta.depth > 0 && meta.depth <= 1000 && meta.rankBasis === 'organic', `${label}: неполный профиль съёма ${engine}.`);
+              check(typeof meta.region === 'string' && meta.region.trim() && [0,1,2].includes(meta.device) && typeof meta.language === 'string' && meta.language.trim(), `${label}: не подтверждены регион, язык или устройство ${engine}.`);
+            }
+          }
           for (const row of snapshot.rows || []) {
             check(typeof row.id === 'string' && typeof row.query === 'string' && row.query.trim(), `${label}: запрос без ID или текста.`);
-            for (const engine of ENGINES) if (own(row, engine)) check(row[engine] === null || (Number.isInteger(row[engine]) && row[engine] > 0 && row[engine] <= 1000), `${label}: неверная позиция.`);
+            if (own(row,'failedEngines')) {
+              const failures = row.failedEngines;
+              check(snapshot === report.rankings.after && Array.isArray(failures) && new Set(failures).size === failures.length && failures.every(engine => ENGINES.includes(engine) && !own(row,engine)),`${label}: ошибка съёма должна быть отдельной от позиции текущего замера.`);
+            }
+            for (const engine of ENGINES) if (own(row, engine)) {
+              check(row[engine] === null || (Number.isInteger(row[engine]) && row[engine] > 0 && row[engine] <= 1000), `${label}: неверная позиция.`);
+              if (Number.isInteger(snapshot.engines?.[engine]?.depth) && typeof row[engine] === 'number') check(row[engine] <= snapshot.engines[engine].depth, `${label}: позиция за пределами подтверждённой глубины.`);
+            }
+          }
+        }
+        if (report.rankings.reference) check(!!report.rankings.after && report.rankings.reference.date < report.rankings.after.date, `${label}: неверная дата опорного замера.`);
+        if (own(report.rankings,'cohorts')) {
+          const cohorts = report.rankings.cohorts;
+          check(Array.isArray(cohorts),`${label}: неверные выборки запросов.`);
+          if (Array.isArray(cohorts)) {
+            check(new Set(cohorts.map(c => c?.id)).size === cohorts.length,`${label}: повторные выборки запросов.`);
+            const ids = new Set(snapshots.flatMap(s => (s.rows || []).map(r => r.id)));
+            for (const c of cohorts) check(c && typeof c.id === 'string' && c.id.trim() && c.id !== 'all' && typeof c.label === 'string' && c.label.trim() && Array.isArray(c.queryIds) && c.queryIds.length > 0 && new Set(c.queryIds).size === c.queryIds.length && c.queryIds.every(id => typeof id === 'string' && ids.has(id)),`${label}: неверный состав выборки запросов.`);
           }
         }
         if (report.rankings.before && report.rankings.after) check(report.rankings.before.date < report.rankings.after.date, `${label}: неверный порядок дат.`);
         if (report.rankings.start) check(report.rankings.start.date <= (report.rankings.before?.date || report.rankings.after?.date || report.rankings.start.date), `${label}: первый замер позже отчётного периода.`);
       }
-      if (report.traffic) check(Number.isInteger(report.traffic.visits) && report.traffic.visits >= 0, `${label}: неверное число визитов.`);
+      if (report.traffic) {
+        const t = report.traffic;
+        check(Number.isInteger(t.visits) && t.visits >= 0, `${label}: неверное число визитов.`);
+        if (['coverage','periods','weeks','csv','attribution'].some(k => own(t,k))) {
+          const day = date => validDate(date) ? Date.parse(date+'T00:00:00Z') / 86400000 : NaN;
+          const validPeriod = p => !!p && validDate(p.from) && validDate(p.to) && p.from <= p.to && ['total','yandex','google','other'].every(k => Number.isInteger(p[k]) && p[k] >= 0) && p.total === p.yandex + p.google + p.other;
+          const before = t.periods?.before, after = t.periods?.after;
+          check(validDate(t.coverage?.from) && validDate(t.coverage?.to) && t.coverage.from <= t.coverage.to,`${label}: неверный период трафика.`);
+          check(typeof t.attribution === 'string' && t.attribution.trim(),`${label}: отсутствует атрибуция трафика.`);
+          check(typeof t.csv === 'string' && t.csv.startsWith('evidence/') && /\.csv$/.test(t.csv) && safeHref(t.csv) === t.csv,`${label}: неверное приложение трафика.`);
+          check(validPeriod(before) && validPeriod(after),`${label}: неверные итоги сравнения трафика.`);
+          if (validPeriod(before) && validPeriod(after)) {
+            check(day(before.to) + 1 === day(after.from) && day(before.to) - day(before.from) === day(after.to) - day(after.from),`${label}: периоды трафика должны быть последовательными и одинаковой длины.`);
+            check(t.visits === after.total,`${label}: число визитов не совпадает с текущим периодом.`);
+          }
+          check(Array.isArray(t.weeks) && t.weeks.length > 0,`${label}: нет недельной истории трафика.`);
+          if (Array.isArray(t.weeks) && t.weeks.length) {
+            for (let i=0;i<t.weeks.length;i++) {
+              const w = t.weeks[i];
+              check(validPeriod(w) && day(w.to) - day(w.from) === 6,`${label}: неверная полная неделя трафика.`);
+              if (i) check(day(t.weeks[i-1].to) + 1 === day(w.from),`${label}: пропуск или пересечение недель трафика.`);
+            }
+            check(t.weeks[0].from === t.coverage?.from && t.weeks.at(-1).to === t.coverage?.to,`${label}: границы недель не совпадают с покрытием трафика.`);
+            for (const p of [before,after].filter(validPeriod)) {
+              const included = t.weeks.filter(w => w.from >= p.from && w.to <= p.to);
+              check(included[0]?.from === p.from && included.at(-1)?.to === p.to && ['total','yandex','google','other'].every(k => included.reduce((sum,w) => sum + w[k],0) === p[k]),`${label}: итог периода трафика не совпадает с неделями.`);
+            }
+          }
+        }
+      }
       check(Array.isArray(report.works), `${label}: отсутствует список работ.`);
       check(new Set((report.works || []).map(w => w.id)).size === report.works?.length, `${label}: повторные работы.`);
       for (const work of report.works || []) {
@@ -179,5 +275,5 @@
     }
     return errors;
   }
-  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, rankChange, rankingsView, filterRows, validateData};
+  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
 });
