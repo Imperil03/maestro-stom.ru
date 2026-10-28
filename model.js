@@ -55,7 +55,17 @@
   }
   const sameSettings = (before,after,engine) => comparisonSettings(before,after,engine).comparable;
   const withinDepth = (value,depth) => typeof value === 'number' && depth && value > depth ? null : value;
+  const displayRank = (value, missingRank = 101) => typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : missingRank;
+  function snapshotCounts(rows) {
+    return Object.fromEntries(ENGINES.map(engine => [engine,Object.fromEntries(['start','before','after'].map(side => {
+      const values = rows.map(row => row[engine]?.[side]);
+      return [side,{total:rows.length,measured:values.filter(value => value !== undefined).length,
+        top3:values.filter(value => typeof value === 'number' && value <= 3).length,
+        top10:values.filter(value => typeof value === 'number' && value <= 10).length}];
+    }))]));
+  }
   function rankingsView(rankings, {cohort = 'all'} = {}) {
+    const monthlyComparison = rankings?.presentation?.comparison === 'previous_month';
     const selected = cohort === 'all' ? null : rankings?.cohorts?.find(c => c.id === cohort);
     if (cohort !== 'all' && !selected) throw new RangeError('Неизвестная выборка запросов.');
     const selectedIds = selected ? new Set(selected.queryIds) : null;
@@ -71,14 +81,14 @@
         const row={id:r.id,query:r.query,direction:r.direction||'',isNew:false,removed:false};
         for(const engine of ENGINES){
           const first=initial.get(r.id);
-          row[engine]={start:first&&normalize(first.query)===normalize(r.query)&&sameSettings(start,reference,engine)?first[engine]:undefined,before:previous.get(r.id)?.[engine],after:undefined,change:{kind:'no_data',amount:null}};
+          row[engine]={start:first&&normalize(first.query)===normalize(r.query)&&(monthlyComparison||sameSettings(start,reference,engine))?first[engine]:undefined,before:previous.get(r.id)?.[engine],after:undefined,change:{kind:'no_data',amount:null}};
         }
         return row;
       });
-      return {start,before,after:null,reference:rankings.reference || null,history,scope,rows,stats:null,metaMatch:true,pending:true,notes:rankings.notes||[]};
+      return {start,before,after:null,reference:rankings.reference || null,presentation:rankings.presentation || null,history,scope,rows,snapshotCounts:snapshotCounts(rows),stats:null,metaMatch:true,pending:true,notes:rankings.notes||[]};
     }
     if (!rankings?.after) return null;
-    const {start, after} = rankings, before = rankings.reference || rankings.before;
+    const {start, after} = rankings, before = monthlyComparison ? rankings.before : rankings.reference || rankings.before;
     const comparisons = Object.fromEntries(ENGINES.map(e => [e,comparisonSettings(before,after,e)]));
     const matches = Object.fromEntries(ENGINES.map(e => [e,comparisons[e].comparable]));
     const beforeMap = new Map((before?.rows || []).map(r => [r.id, r]));
@@ -92,7 +102,7 @@
       for (const engine of ENGINES) {
         const previous = renamed ? undefined : old?.[engine];
         const initial = startMap.get(id);
-        const initialMatches = initial && normalize(initial.query) === normalize(display.query) && sameSettings(start,after,engine);
+        const initialMatches = initial && normalize(initial.query) === normalize(display.query) && (monthlyComparison || sameSettings(start,after,engine));
         const commonDepth = comparisons[engine].commonDepth;
         const compareBefore = withinDepth(previous,commonDepth), compareAfter = withinDepth(current?.[engine],commonDepth);
         const change = commonDepth && matches[engine] && !isNew && compareBefore === null && compareAfter === null ? {kind:'outside',amount:null} : rankChange(compareBefore,compareAfter,matches[engine],isNew);
@@ -127,7 +137,7 @@
       }
       stats[engine] = result;
     }
-    return {start,before,after,reference:rankings.reference || null,history,scope,rows,stats,comparisons,metaMatch:ENGINES.every(e => matches[e]),pending:false,notes:rankings.notes||[]};
+    return {start,before,after,reference:rankings.reference || null,presentation:rankings.presentation || null,history,scope,rows,snapshotCounts:snapshotCounts(rows),stats,comparisons,metaMatch:ENGINES.every(e => matches[e]),pending:false,notes:rankings.notes||[]};
   }
   function filterRows(rows, {search = '', direction = '', trend = 'all'} = {}) {
     const term = normalize(search).replaceAll('ё', 'е');
@@ -169,6 +179,11 @@
         }
       }
       if (report.rankings) {
+        if (own(report.rankings,'presentation')) {
+          const presentation = report.rankings.presentation;
+          check(presentation && typeof presentation === 'object' && !Array.isArray(presentation) && presentation.comparison === 'previous_month' && presentation.missingRank === 101, `${label}: неверное оформление дат и пропусков.`);
+          check(!!report.rankings.start && !!report.rankings.before && !!report.rankings.after, `${label}: для таблицы нужны три датированных замера.`);
+        }
         const pending=report.rankings.pending===true;
         check(pending ? report.rankings.after===null && !!(report.rankings.before||report.rankings.start) : !!report.rankings.after, `${label}: нет текущего среза или явно зарезервированного столбца.`);
         if(pending)check(report.status==='in_progress',`${label}: ожидающий замер нельзя выдавать за завершённый отчёт.`);
@@ -275,5 +290,5 @@
     }
     return errors;
   }
-  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
+  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, displayRank, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
 });

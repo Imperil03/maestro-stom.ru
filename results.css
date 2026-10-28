@@ -1,6 +1,10 @@
 .results-heading{padding:40px 0 28px}
 .results-heading h2{font-size:32px;line-height:1.4}
 .results-heading p{font-size:var(--intro-size);line-height:1.85;max-width:75ch;margin-top:20px}
+.results-heading .results-intro{width:80%;max-width:1000px;margin-top:24px}
+.results-heading .results-intro p{max-width:none;font-size:17px;line-height:1.75;margin-top:16px;color:var(--ink)}
+.results-heading .results-intro p:first-child{margin-top:0}
+.results-heading .results-intro strong{font-weight:600}
 .engine-kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin-bottom:40px;--searcher-yandex:#bd2f1b;--searcher-google:#1b5fbc}
 .engine-kpi-card{padding:32px 36px;min-width:0}
 .engine-kpi-card .searcher-name{font-size:26px;line-height:1.4;font-weight:600;margin-bottom:28px}
@@ -46,37 +50,10 @@
 .initial-positions th,.initial-positions td{overflow-wrap:anywhere}
 .initial-positions .competitor-rank{color:var(--muted)}
 .rank-label-short{display:none}
-.rank-scope{padding:28px 32px;margin:32px 0 24px;display:flex;justify-content:space-between;gap:28px;align-items:center}
-.rank-scope h3{font-size:20px;line-height:1.5}
-.rank-scope p{font-size:14px;color:var(--muted);margin-top:7px}
-.scope-options{display:flex;gap:10px;flex-wrap:wrap;flex:0 1 540px;justify-content:flex-end}
+.rank-scope{padding:24px 32px;margin:32px 0 24px;display:flex;align-items:center}
+.scope-options{display:flex;gap:10px;flex-wrap:wrap}
 .scope-options button,.traffic-series-switch button{border:1px solid #d8ddeb;background:white;border-radius:8px;padding:12px 16px;min-height:48px;font-size:14px;font-weight:500;line-height:1.5}
 .scope-options button[aria-pressed=true]{color:var(--accent);border-color:#c7c2ee;background:var(--accent-soft)}
-.ranking-summary{padding:20px 24px;border-left:3px solid var(--accent);margin:24px 0 28px;background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:16px;line-height:1.8}
-.ranking-summary p+p{margin-top:6px}
-.comparison-context{font-size:14px;line-height:1.75;color:var(--muted);max-width:95ch;margin:18px 0 22px}
-.comparison-context p+p{margin-top:5px}
-.comparison-context .comparison-error{color:var(--negative);margin-top:10px}
-.measurement-parameters{padding:18px 28px;margin:0 0 28px;font-size:14px;line-height:1.8;color:var(--muted)}
-.measurement-parameters summary{cursor:pointer;min-height:44px;display:list-item;padding:8px 0;font-size:15px;font-weight:500;color:var(--ink)}
-.measurement-parameters p{margin-top:14px}
-.engine-population,.current-top30{font-size:14px;color:var(--muted);line-height:1.75;margin-top:24px}
-.engine-movement{display:flex;flex-wrap:wrap;gap:8px 22px;border-top:1px solid var(--line);padding-top:18px;margin-top:20px;font-size:14px;color:var(--muted)}
-.engine-movement strong,.current-top30 strong{font-weight:600;color:var(--ink)}
-.engine-movement+.engine-population{margin-top:12px}
-.engine-error-note{font-size:14px;line-height:1.75;color:var(--negative);margin-top:12px}
-.rank-error{display:inline-block;padding:4px 6px;border-radius:4px;background:var(--negative-soft);color:var(--negative);font-size:12px;font-weight:500;line-height:1.45}
-.current-top30{margin-top:16px}
-.ranking-history{padding:26px 32px;margin:30px 0 0;font-size:15px}
-.ranking-history summary,.traffic-details summary{cursor:pointer;font-weight:600;font-size:17px;line-height:1.6;padding:7px 0;min-height:44px}
-.history-note,.history-profile{color:var(--muted);line-height:1.8;margin-top:16px}
-.history-scroll{overflow:auto;max-height:520px;margin-top:24px;border:1px solid var(--line);border-radius:8px}
-.history-table,.traffic-week-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;font-size:14px;line-height:1.6}
-.history-table th,.history-table td,.traffic-week-table th,.traffic-week-table td{padding:14px 16px;text-align:center;border-bottom:1px solid var(--line)}
-.history-table th:first-child,.traffic-week-table th:first-child{text-align:left}
-.history-table thead th,.traffic-week-table thead th{background:#f4f5f8;color:var(--muted);font-weight:500;position:sticky;top:0;z-index:1}
-.history-table tbody th,.traffic-week-table tbody th{font-weight:500}
-.history-table tbody th{min-width:240px;max-width:380px}
 .traffic-report{display:block;min-width:0}
 .traffic-report-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}
 .traffic-report-heading>p{font-size:15px;line-height:1.8;color:var(--muted);max-width:520px}
@@ -89,7 +66,6 @@
 .traffic-totals>svg{width:24px;height:24px;color:var(--muted)}
 .traffic-metric>p{font-size:23px;font-weight:600;margin-top:10px}
 .traffic-metric>p>span{font-size:15px;font-weight:400;color:var(--muted)}
-.traffic-coverage{font-size:14px;line-height:1.8;color:var(--muted);margin-top:26px}
 .traffic-weekly-figure{margin:30px 0 0;border-top:1px solid var(--line);padding-top:24px}
 .traffic-weekly-figure figcaption{font-size:18px;font-weight:600;line-height:1.6}
 .traffic-series-switch{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
@@ -110,14 +86,6 @@
 .point-google{fill:#5953cf}
 .traffic-point:hover,.traffic-point:focus{stroke:var(--ink);stroke-width:3;outline:none;r:7}
 .traffic-point-readout{font-size:14px;line-height:1.7;color:var(--ink);margin-top:16px;min-height:24px}
-.traffic-chart-hint{display:none;font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7}
-.traffic-scale{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7}
-.traffic-details{margin-top:24px;border-top:1px solid var(--line);padding-top:16px}
-.traffic-yandex{margin:20px 0 24px}
-.traffic-yandex .traffic-totals>strong{font-size:32px}
-.traffic-yandex .traffic-totals>span{font-size:24px}
-.traffic-yandex .traffic-metric>p{font-size:20px}
-.traffic-table-scroll{overflow:auto;max-width:100%;max-height:520px;border:1px solid var(--line);border-radius:8px}
 .traffic-csv{font-size:15px;margin-top:24px}
 .traffic-csv a{display:inline-flex;align-items:center;gap:9px;overflow-wrap:anywhere}
 .traffic-csv svg{width:18px;height:18px}
@@ -159,4 +127,15 @@
   .positions-table.initial-positions th.query-heading,.positions-table.initial-positions td:first-child{padding-left:8px;padding-right:12px}
   .rank-label-long{display:none}
   .rank-label-short{display:inline}
+}
+
+/* The client view contains results, controls and dates only. */
+.queries-card .snapshot-positions thead th time{margin-top:0}
+@media(max-width:900px){.rank-scope .scope-options{margin-top:0}}
+@media(max-width:600px){
+  .results-heading .results-intro{width:100%;max-width:none;margin-top:20px}
+  .results-heading .results-intro p{font-size:16px;line-height:1.75}
+  .queries-card .snapshot-positions thead th time{font-size:12px;line-height:1.45;white-space:normal}
+  .rank-scope{padding:22px 24px}
+  .rank-scope .scope-options{width:100%;margin-top:0}
 }
