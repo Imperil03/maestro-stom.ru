@@ -180,6 +180,9 @@
       check(report.projectId === data.project.id && /^\d{4}-(0[1-9]|1[0-2])$/.test(label), 'Неверный идентификатор месяца.');
       check(['in_progress','closed'].includes(report.status), `${label}: неизвестное состояние отчёта.`);
       for (const key of ['intro','conclusions']) check(Array.isArray(report[key]) && report[key].every(x => typeof x === 'string'), `${label}: неверный текст ${key}.`);
+      if (own(report,'worksIntro')) {
+        check(Array.isArray(report.worksIntro) && report.worksIntro.every(x => typeof x === 'string' && x.trim()), `${label}: неверный вводный текст о работах.`);
+      }
       check(!(report.archive && report.rankings), `${label}: архив смешан с API.`);
       if (report.archive) {
         const a = report.archive;
@@ -277,13 +280,16 @@
       for (const work of report.works || []) {
         check(['id','title','summary','result'].every(k => typeof work[k] === 'string' && work[k].trim()), `${label}: неполная работа.`);
         check(work.why === null || typeof work.why === 'string', `${label}: неверное пояснение работы.`);
+        if (own(work,'resultTitle')) check(typeof work.resultTitle === 'string' && work.resultTitle.trim(), `${label}: неверный заголовок результата.`);
         if (own(work,'retainedEvidence')) check(Array.isArray(work.retainedEvidence) && work.retainedEvidence.every(url => typeof url === 'string' && url.startsWith('evidence/') && safeHref(url) === url), `${label}: неверный путь сохранённого подтверждения.`);
         for (const section of work.sections || []) {
           const validSection = !!section && typeof section === 'object' && !Array.isArray(section);
           check(validSection, `${label}: неверный раздел работы.`);
           if (!validSection) continue;
           if (own(section,'title')) check(typeof section.title === 'string', `${label}: неверный заголовок раздела.`);
+          if (own(section,'ordered')) check(typeof section.ordered === 'boolean', `${label}: неверный формат списка.`);
           if (own(section,'afterText')) check(typeof section.afterText === 'string', `${label}: неверный текст после таблицы.`);
+          if (own(section,'afterLinks')) check(typeof section.afterLinks === 'string', `${label}: неверный текст после ссылок.`);
           if (own(section,'note')) check(typeof section.note === 'string', `${label}: неверное примечание раздела.`);
           if (own(section,'table')) {
             const table = section.table;

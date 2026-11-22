@@ -164,7 +164,9 @@
   function worksHTML() {
     if (!report.works.length) return pendingHTML('works');
     const details = hasWorkDetails(state.month);
-    return `<div class="works-heading"><h2>Работы за ${M.monthLabel(state.month).toLowerCase()}</h2></div><section class="surface"><table class="works-table${details ? '' : ' without-details'}"><thead><tr><th scope="col">Что сделали</th><th scope="col">Краткое описание</th><th scope="col">Для чего это нужно</th>${details ? '<th scope="col">Подробнее</th>' : ''}</tr></thead><tbody>${report.works.map(work => `<tr><td><h3 class="work-name">${esc(work.title)}</h3></td><td class="work-summary">${esc(work.summary)}</td><td data-label="Для чего это нужно">${work.why ? paragraphsHTML(work.why) : '—'}</td>${details ? `<td><button type="button" class="work-open" data-work="${esc(work.id)}" aria-label="Подробнее: ${esc(work.title)}">Подробнее${icon('arrow')}</button></td>` : ''}</tr>`).join('')}</tbody></table></section>`;
+    const intro = (report.worksIntro || []).map(detailParagraphsHTML).join('');
+    const heading = `<div class="works-heading"><h2>Работы за ${M.monthLabel(state.month).toLowerCase()}</h2>${intro ? `<div class="works-intro">${intro}</div>` : ''}</div>`;
+    return heading + `<section class="surface"><table class="works-table${details ? '' : ' without-details'}"><thead><tr><th scope="col">Что сделали</th><th scope="col">Краткое описание</th><th scope="col">Для чего это нужно</th>${details ? '<th scope="col">Подробнее</th>' : ''}</tr></thead><tbody>${report.works.map(work => `<tr><td><h3 class="work-name">${esc(work.title)}</h3></td><td class="work-summary">${esc(work.summary)}</td><td data-label="Для чего это нужно">${work.why ? paragraphsHTML(work.why) : '—'}</td>${details ? `<td><button type="button" class="work-open" data-work="${esc(work.id)}" aria-label="Подробнее: ${esc(work.title)}">Подробнее${icon('arrow')}</button></td>` : ''}</tr>`).join('')}</tbody></table></section>`;
   }
   function tableHTML(item, emphasize = false) {
     const isUrlMap = item.rows.length > 0 && item.rows.every(row => row.length === 3 && [row[1],row[2]].every(value => typeof value === 'string' && value.startsWith('/')));
@@ -184,7 +186,10 @@
     return `<details class="evidence-block"${hasImages || item.type === 'table' ? ' open' : ''}><summary>${esc(item.label)}</summary><div class="evidence-content">${item.text ? `<p class="evidence-intro">${esc(item.text)}</p>` : ''}${body}</div></details>`;
   }
   function sectionHTML(section) {
-    return `<section class="detail-section">${section.title?.trim() ? `<h3>${esc(section.title)}</h3>` : ''}${detailParagraphsHTML(section.text)}${section.bullets?.length ? `<ul>${section.bullets.map(b => `<li>${strongHTML(b)}</li>`).join('')}</ul>` : ''}${section.table ? tableHTML({...section.table,label:section.table.label || section.title || 'Таблица'},true) : ''}${section.note ? `<p class="section-note">${strongHTML(section.note)}</p>` : ''}${detailParagraphsHTML(section.afterText)}${section.links?.length ? `<ul class="detail-links">${section.links.map(l => `<li>${linkHTML(l)}</li>`).join('')}</ul>` : ''}</section>`;
+    const listTag = section.ordered ? 'ol' : 'ul';
+    const list = section.bullets?.length ? `<${listTag}>${section.bullets.map(b => `<li>${strongHTML(b)}</li>`).join('')}</${listTag}>` : '';
+    const links = section.links?.length ? `<ul class="detail-links">${section.links.map(l => `<li>${linkHTML(l)}</li>`).join('')}</ul>` : '';
+    return `<section class="detail-section">${section.title?.trim() ? `<h3>${esc(section.title)}</h3>` : ''}${detailParagraphsHTML(section.text)}${list}${section.table ? tableHTML({...section.table,label:section.table.label || section.title || 'Таблица'},true) : ''}${section.note ? `<p class="section-note">${strongHTML(section.note)}</p>` : ''}${detailParagraphsHTML(section.afterText)}${links}${detailParagraphsHTML(section.afterLinks)}</section>`;
   }
   function renderDetail() {
     const work = state.tab === 'works' && hasWorkDetails(state.month) && report.works.find(w => w.id === state.detail);
@@ -196,7 +201,7 @@
     if (key === currentDetail && dialog.open) return;
     dialog.dataset.reportView = 'works'; $('detail-title').textContent = work.title; $('detail-meta').hidden = true;
     const sections = (work.sections || []).map(sectionHTML).join('');
-    $('detail-body').innerHTML = `<section class="actual-result"><h3>Что сделали</h3>${detailParagraphsHTML(work.result)}${work.resultBullets?.length ? `<ul class="result-bullets">${work.resultBullets.map(b => `<li>${strongHTML(b)}</li>`).join('')}</ul>` : ''}${sections}${(work.evidence || []).map(evidenceHTML).join('')}</section>`;
+    $('detail-body').innerHTML = `<section class="actual-result"><h3>${esc(work.resultTitle || 'Что сделали')}</h3>${detailParagraphsHTML(work.result)}${work.resultBullets?.length ? `<ul class="result-bullets">${work.resultBullets.map(b => `<li>${strongHTML(b)}</li>`).join('')}</ul>` : ''}${sections}${(work.evidence || []).map(evidenceHTML).join('')}</section>`;
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('dialog-open'); }
     $('detail-body').scrollTop = 0; $('close-detail').focus({preventScroll:true}); currentDetail = key;
   }
