@@ -88,7 +88,7 @@
 .traffic-legend span{display:inline-flex;align-items:center;gap:9px}
 .key-forecast{height:0;background:none;border-top:2px dashed #805ab7}
 .traffic-total-only .traffic-weekly-chart{min-width:0}
-.traffic-source{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.65}
+.traffic-total-only .traffic-metric-grid{grid-template-columns:1fr}
 .traffic-point{stroke:#fff;stroke-width:2;cursor:crosshair}
 .point-total{fill:#197d77}
 .point-google{fill:#5953cf}

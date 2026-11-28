@@ -74,13 +74,26 @@
     const top10 = values.filter(value => Number.isInteger(value) && value >= 1 && value <= 10).length;
     return {total,top10,percent:total ? top10 / total * 100 : null,measured:values.filter(value => value !== undefined).length};
   }
-  function snapshotCounts(rows) {
-    return Object.fromEntries(ENGINES.map(engine => [engine,Object.fromEntries(['start','before','after'].map(side => {
+  function engineCounts(rows, engine) {
+    return Object.fromEntries(['start','before','after'].map(side => {
       const values = rows.map(row => row[engine]?.[side]);
       return [side,{total:rows.length,measured:values.filter(value => value !== undefined).length,
         top3:values.filter(value => typeof value === 'number' && value <= 3).length,
         top10:values.filter(value => typeof value === 'number' && value <= 10).length}];
-    }))]));
+    }));
+  }
+  function snapshotCounts(rows) {
+    return Object.fromEntries(ENGINES.map(engine => [engine,engineCounts(rows,engine)]));
+  }
+  function rankingsSummary(rankings, options) {
+    const before = rankings?.kpiBaseline;
+    if (!before || !rankings.after) return null;
+    const comparison = rankingsView({...rankings,before,reference:null},options);
+    const counts = Object.fromEntries(ENGINES.map(engine => {
+      const paired = comparison.rows.filter(row => !row.isNew && row[engine].before !== undefined && row[engine].after !== undefined);
+      return [engine,engineCounts(paired,engine)];
+    }));
+    return {before,after:rankings.after,counts,comparisons:comparison.comparisons};
   }
   function rankingsView(rankings, {cohort = 'all'} = {}) {
     const monthlyComparison = rankings?.presentation?.comparison === 'previous_month';
@@ -210,7 +223,7 @@
         if(pending)check(report.status==='in_progress',`${label}: ожидающий замер нельзя выдавать за завершённый отчёт.`);
         if(report.rankings.after)check(report.rankings.after.date?.slice(0,7) === label, `${label}: срез относится к другому месяцу.`);
         if(own(report.rankings,'notes'))check(Array.isArray(report.rankings.notes)&&report.rankings.notes.every(n=>typeof n==='string'),`${label}: неверные пояснения замеров.`);
-        const snapshots = [report.rankings.start,report.rankings.before,report.rankings.reference,report.rankings.after].filter(Boolean);
+        const snapshots = [report.rankings.start,report.rankings.before,report.rankings.reference,report.rankings.kpiBaseline,report.rankings.after].filter(Boolean);
         for (const snapshot of snapshots) {
           check(validDate(snapshot.date) && snapshot.region && snapshot.device && snapshot.sourceKey, `${label}: неполные настройки замера.`);
           check(Array.isArray(snapshot.rows) && new Set(snapshot.rows.map(r => r.id)).size === snapshot.rows.length, `${label}: неполные или повторные запросы.`);
@@ -234,6 +247,7 @@
           }
         }
         if (report.rankings.reference) check(!!report.rankings.after && report.rankings.reference.date < report.rankings.after.date, `${label}: неверная дата опорного замера.`);
+        if (report.rankings.kpiBaseline) check(!!report.rankings.after && report.rankings.kpiBaseline.date < report.rankings.after.date, `${label}: неверная дата сводки позиций.`);
         if (own(report.rankings,'cohorts')) {
           const cohorts = report.rankings.cohorts;
           check(Array.isArray(cohorts),`${label}: неверные выборки запросов.`);
@@ -307,6 +321,8 @@
           if (!validSection) continue;
           if (own(section,'title')) check(typeof section.title === 'string', `${label}: неверный заголовок раздела.`);
           if (own(section,'ordered')) check(typeof section.ordered === 'boolean', `${label}: неверный формат списка.`);
+          if (own(section,'bullets')) check(Array.isArray(section.bullets) && section.bullets.every(item =>
+            typeof item === 'string' || (typeof item?.label === 'string' && item.label.trim() && !!safeHref(item.url))), `${label}: неверный пункт списка.`);
           if (own(section,'afterText')) check(typeof section.afterText === 'string', `${label}: неверный текст после таблицы.`);
           if (own(section,'afterLinks')) check(typeof section.afterLinks === 'string', `${label}: неверный текст после ссылок.`);
           if (own(section,'note')) check(typeof section.note === 'string', `${label}: неверное примечание раздела.`);
@@ -332,5 +348,5 @@
     }
     return errors;
   }
-  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, forecastVisits, normalize, displayRank, rankDisplayChange, rankVisibility, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
+  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, forecastVisits, normalize, displayRank, rankDisplayChange, rankVisibility, rankChange, comparisonSettings, rankingsView, rankingsSummary, filterRows, validateData};
 });

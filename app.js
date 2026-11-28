@@ -17,7 +17,7 @@
   const tabs = ['results','works'], months = M.months(data), dialog = $('detail-dialog');
   const hasWorkDetails = month => month >= '2026-10';
   const state = {month:M.defaultMonth(data),tab:'works',detail:null,filters:{search:'',direction:'',trend:'all'},limit:25,engine:'yandex',cohort:'all',trafficSeries:['total','google']};
-  let view = null, report = null, positionColumns = null, renderedMonth = null, currentDetail = null, lastOpener = null;
+  let view = null, summary = null, report = null, positionColumns = null, renderedMonth = null, currentDetail = null, lastOpener = null;
   const imageDialog = $('image-dialog');
   let imageOpener = null;
   function linkHTML(item) {
@@ -50,19 +50,30 @@
     const text = kind === 'works' ? 'Будем добавлять выполненные работы по мере готовности. Итоги месяца появятся после его завершения.' : 'Здесь появятся сохранённые замеры Яндекса и Google с фактическими датами проверки.';
     return `<div class="empty-state surface"><div class="empty-symbol">${icon(kind === 'works' ? 'work' : 'chart')}</div><div><h2>${heading}</h2><p>${text}</p></div></div>`;
   }
+  function rankEngineStats(engine) {
+    const stats = view.stats[engine];
+    const counts = summary?.counts[engine] || view.snapshotCounts?.[engine];
+    if (!counts) return stats;
+    return {...stats,total:counts.after.total,comparable:true,
+      top3:{before:counts.before.top3,after:counts.after.top3},
+      top10:{before:counts.before.top10,after:counts.after.top10}};
+  }
   function kpiHTML(engine, top) {
     if (report.archive) {
       const metric = report.archive.kpis[engine]['top' + top];
       const before = metric.before.replace(/^Было:\s*/i,'').trim(), after = metric.after.replace(/^Стало:\s*/i,'').trim();
       return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><div class="kpi-values"><div><span class="kpi-period">Было</span><span class="number before">${esc(before)}</span></div>${icon('arrow','kpi-arrow')}<div><span class="kpi-period">Стало</span><span class="number neutral">${esc(after)}</span></div></div><p class="kpi-count archive-change">${esc(metric.change)}</p></div>`;
     }
-    const stats = view?.stats[engine], snapshots = view?.snapshotCounts?.[engine];
-    const metric = snapshots ? {before:snapshots.before['top'+top],after:snapshots.after['top'+top]} : stats?.['top' + top];
-    const total=snapshots?.after.total??stats?.total;
+    const stats = rankEngineStats(engine);
+    const metric = stats['top' + top], total = stats.total;
     if (!total) return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><p class="no-metric">Нет данных</p></div>`;
     const after = metric.after / total * 100, before = metric.before === null ? null : metric.before / total * 100;
-    const trend = before === null || after === before ? 'neutral' : after > before ? 'positive' : 'negative';
-    return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><div class="kpi-values">${before === null ? '' : `<div><span class="kpi-period">Было</span><span class="number before">${number(metric.before)}</span></div>${icon('arrow','kpi-arrow')}`}<div>${before === null ? '' : '<span class="kpi-period">Стало</span>'}<span class="number ${trend}">${number(metric.after)}</span></div></div><p class="kpi-count">из ${number(total)} запросов · ${number(after)}%</p></div>`;
+    const sameProfile = !summary || summary.comparisons[engine].comparable;
+    const trend = !sameProfile || before === null || after === before ? 'neutral' : after > before ? 'positive' : 'negative';
+    const baselineLabel = summary ? dateLabel(summary.before.date).slice(0,5) : 'Было';
+    const latestLabel = summary ? dateLabel(summary.after.date).slice(0,5) : 'Стало';
+    const arrow = sameProfile ? icon('arrow','kpi-arrow') : '';
+    return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><div class="kpi-values">${before === null ? '' : `<div><span class="kpi-period">${baselineLabel}</span><span class="number before">${number(metric.before)}</span></div>${arrow}`}<div>${before === null ? '' : `<span class="kpi-period">${latestLabel}</span>`}<span class="number ${trend}">${number(metric.after)}</span></div></div><p class="kpi-count">из ${number(total)} ${summary?'общих ':''}запросов · ${number(after)}%</p></div>`;
   }
   function engineKpisHTML() {
     return `<div class="engine-kpi-grid">${M.ENGINES.map(engine => `<section class="engine-kpi-card surface engine-${engine}" aria-labelledby="kpi-heading-${engine}"><h3 class="searcher-name" id="kpi-heading-${engine}">${engine==='yandex'?'Яндекс':'Google'}</h3><div class="engine-kpi-metrics">${[10,3].map(top=>kpiHTML(engine,top)).join('')}</div></section>`).join('')}</div>`;
@@ -73,10 +84,7 @@
     const percent = text => Number.parseFloat(text.replace(/^.*?:\s*/,'').replace(',','.'));
     const stats = archive ? Object.fromEntries(M.ENGINES.map(engine => [engine, Object.fromEntries([3,10].map(top => ['top' + top, {
       before:percent(archive.kpis[engine]['top' + top].before), after:percent(archive.kpis[engine]['top' + top].after)
-    }]))])) : Object.fromEntries(M.ENGINES.map(engine=>{
-      const s=view.stats[engine],snapshots=view.snapshotCounts?.[engine];
-      return [engine,snapshots?{...s,comparable:true,top3:{before:snapshots.before.top3,after:snapshots.after.top3},top10:{before:snapshots.before.top10,after:snapshots.after.top10}}:s];
-    }));
+    }]))])) : Object.fromEntries(M.ENGINES.map(engine=>[engine,rankEngineStats(engine)]));
     const chartTops=()=>[3,10];
     const max=Math.max(1,...Object.values(stats).flatMap(s=>chartTops(s).flatMap(top=>[s['top'+top].before,s['top'+top].after]).filter(Number.isFinite)));
     return `<div class="charts-grid">${M.ENGINES.map(engine => {
@@ -87,7 +95,9 @@
         return Number.isFinite(value) ? `<div class="rank-bar ${side}" style="height:${value / max * 104}px"><span>${number(value)}${archive ? '%' : ''}</span></div>` : '';
       }).join('')}<strong>Топ-${top}</strong></div>`).join('');
       const name = engine === 'yandex' ? 'Яндекс' : 'Google';
-      return `<section class="ranking-chart surface" aria-label="${name}: ${archive ? 'доли запросов по архивной сводке' : 'количество запросов'}"><h3>${name}</h3>${archive ? '<p class="archive-chart-note">Доли запросов по сводке архивного отчёта</p>' : ''}<div class="rank-bars">${bars}</div><div class="chart-legend">${comparable ? `<span><i class="before-key"></i>Было${archive ? '' : ' · ' + dateLabel(view.before.date)}</span>` : ''}<span><i></i>${comparable ? 'Стало' : 'Сейчас'}${archive ? '' : ' · ' + dateLabel(view.after.date)}</span></div></section>`;
+      const beforeLabel = summary ? dateLabel(summary.before.date) : 'Было' + (archive ? '' : ' · ' + dateLabel(view.before?.date));
+      const afterLabel = summary ? dateLabel(summary.after.date) : (comparable ? 'Стало' : 'Сейчас') + (archive ? '' : ' · ' + dateLabel(view.after.date));
+      return `<section class="ranking-chart surface" aria-label="${name}: ${archive ? 'доли запросов по архивной сводке' : 'количество запросов'}"><h3>${name}</h3>${archive ? '<p class="archive-chart-note">Доли запросов по сводке архивного отчёта</p>' : ''}<div class="rank-bars">${bars}</div><div class="chart-legend">${comparable ? `<span><i class="before-key"></i>${beforeLabel}</span>` : ''}<span><i></i>${afterLabel}</span></div></section>`;
     }).join('')}</div>`;
   }
   const trafficDate = date => dateLabel(date).slice(0,5);
@@ -102,10 +112,6 @@
     return `<div class="traffic-metric"><h4>${label}</h4><div class="traffic-totals"><span>${number(before[key])}</span>${icon('arrow')}<strong>${number(after[key])}</strong></div><p class="${delta>0?'positive':delta<0?'negative':'neutral'}">${percent===null?'Нет сопоставимой базы':signed(percent)+'%'}<span> · ${signed(delta)} ${unit}</span></p>${dates}</div>`;
   }
   function trafficWeekText(week) {
-    if (week.days) {
-      const projected = M.forecastVisits(week);
-      return `${trafficPeriod(week)} · ${number(projected)} визитов (прогноз). ${number(week.observed)} фактически за ${trafficDate(week.from)}–${trafficDate(week.observedThrough)} и ${number(projected-week.observed)} по прогнозу на выходные.`;
-    }
     const split = Number.isInteger(week.google) ? ` · Google ${number(week.google)}` : '';
     return `${trafficPeriod(week)} · ${number(week.total)} визитов из поиска${split}.`;
   }
@@ -139,7 +145,8 @@
     const legend = split
       ? `<div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${keys.map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div>`
       : `<div class="traffic-legend"><span><i class="series-key" aria-hidden="true"></i>Факт</span>${forecast?'<span><i class="series-key key-forecast" aria-hidden="true"></i>Прогноз</span>':''}</div>`;
-    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div><p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p></figure>`;
+    const readout = split ? `<p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p>` : '';
+    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
   }
   function trafficHTML() {
     const traffic = report.traffic;
@@ -148,11 +155,9 @@
     const {baseline,before,after} = traffic.periods;
     const split = Number.isInteger(after.google);
     const main = trafficMetric(baseline?'К первым четырём неделям июня':'Все поисковые системы',baseline||before,after,'total',!!baseline);
-    const second = split ? trafficMetric('Google',before,after,'google')
-      : baseline ? trafficMetric('К предыдущим четырём неделям',before,after,'total',true) : '';
-    const source = split ? '' : `<p class="traffic-source">${esc(traffic.sourceLabel)} · ${esc(traffic.attribution)}. ${esc(traffic.forecast?.method || '')}</p>`;
+    const second = split ? trafficMetric('Google',before,after,'google') : '';
     const csv = M.safeHref(traffic.csv) ? `<p class="traffic-csv">${linkHTML({url:traffic.csv,label:'Скачать данные о поисковом трафике (CSV)'})}</p>` : '';
-    return `<section class="traffic-card traffic-report${split?'':' traffic-total-only'} surface" aria-labelledby="traffic-heading"><div class="traffic-report-heading"><h3 id="traffic-heading">Поисковый трафик</h3></div><div class="traffic-metric-grid">${main}${second}</div>${trafficChart(traffic,split)}${source}${csv}</section>`;
+    return `<section class="traffic-card traffic-report${split?'':' traffic-total-only'} surface" aria-labelledby="traffic-heading"><div class="traffic-report-heading"><h3 id="traffic-heading">Поисковый трафик</h3></div><div class="traffic-metric-grid">${main}${second}</div>${trafficChart(traffic,split)}${csv}</section>`;
   }
   function scopeHTML() {
     if(!report.rankings?.cohorts?.length||!view||view.pending)return '';
@@ -209,6 +214,7 @@
   }
   function resultsHTML() {
     view=M.rankingsView(report.rankings,{cohort:state.cohort});
+    summary=M.rankingsSummary(report.rankings,{cohort:state.cohort});
     let intro=report.intro.map(detailParagraphsHTML).join('');
     if(report.conclusions.length)intro+=report.conclusions.map(detailParagraphsHTML).join('');
     const heading=`<div class="results-heading"><h2>Результаты за ${M.monthLabel(state.month).toLowerCase()}</h2>${intro?`<div class="results-intro">${intro}</div>`:''}</div>`;
@@ -240,7 +246,7 @@
   }
   function sectionHTML(section) {
     const listTag = section.ordered ? 'ol' : 'ul';
-    const list = section.bullets?.length ? `<${listTag}>${section.bullets.map(b => `<li>${strongHTML(b)}</li>`).join('')}</${listTag}>` : '';
+    const list = section.bullets?.length ? `<${listTag}>${section.bullets.map(b => `<li>${typeof b==='string'?strongHTML(b):linkHTML(b)}</li>`).join('')}</${listTag}>` : '';
     const links = section.links?.length ? `<ul class="detail-links">${section.links.map(l => `<li>${linkHTML(l)}</li>`).join('')}</ul>` : '';
     return `<section class="detail-section">${section.title?.trim() ? `<h3>${esc(section.title)}</h3>` : ''}${detailParagraphsHTML(section.text)}${list}${section.table ? tableHTML({...section.table,label:section.table.label || section.title || 'Таблица'},true) : ''}${section.note ? `<p class="section-note">${strongHTML(section.note)}</p>` : ''}${detailParagraphsHTML(section.afterText)}${links}${detailParagraphsHTML(section.afterLinks)}</section>`;
   }
@@ -328,7 +334,7 @@
     const readout=$('traffic-point-readout');
     if (point && readout) {
       const index = Number(point.dataset.trafficWeek);
-      const week = report.traffic.weeks[index] || report.traffic.forecast;
+      const week = report.traffic.weeks[index];
       if (week) readout.textContent = trafficWeekText(week);
     }
   }
