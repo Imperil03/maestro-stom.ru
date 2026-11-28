@@ -97,7 +97,8 @@
     return selected;
   }
   function rankingsSummary(rankings, {cohort = 'all'} = {}) {
-    const before = rankings?.kpiBaseline, after = rankings?.after;
+    const before = rankings?.presentation?.kpiSummary === 'current_queries' ? rankings.before : rankings?.kpiBaseline;
+    const after = rankings?.after;
     if (!before || !after) return null;
     const selected = findCohort(rankings,cohort);
     const ids = selected ? new Set(selected.queryIds) : null;
@@ -235,6 +236,7 @@
         if (own(report.rankings,'presentation')) {
           const presentation = report.rankings.presentation;
           check(presentation && typeof presentation === 'object' && !Array.isArray(presentation) && presentation.comparison === 'previous_month' && presentation.missingRank === 101, `${label}: неверное оформление дат и пропусков.`);
+          if (presentation && own(presentation,'kpiSummary')) check(presentation.kpiSummary === 'current_queries', `${label}: неверная выборка для сводки позиций.`);
           check(!!report.rankings.start && !!report.rankings.before && !!report.rankings.after, `${label}: для таблицы нужны три датированных замера.`);
         }
         const pending=report.rankings.pending===true;
