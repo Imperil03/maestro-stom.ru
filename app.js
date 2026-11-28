@@ -79,7 +79,7 @@
           <span class="number before">${number(metric.before)}</span>
           <time class="kpi-period kpi-latest-date" datetime="${latest}">${trafficDate(latest)}</time>
           <div class="kpi-current">
-            <span class="number">${number(metric.after)}</span>
+            <span class="number ${trend}">${number(metric.after)}</span>
             <span class="kpi-delta ${trend}" title="Разница между датами" aria-label="Разница между датами ${signed(delta)}">${signed(delta)}</span>
           </div>
         </div>
@@ -140,7 +140,7 @@
     const {weeks,forecast} = traffic;
     const estimated = forecast ? M.forecastVisits(forecast) : 0;
     const width = 900, height = split ? 300 : 200;
-    const pad = split ? {left:48,right:30,top:24,bottom:46} : {left:90,right:68,top:12,bottom:28};
+    const pad = split ? {left:48,right:30,top:24,bottom:46} : {left:4,right:4,top:12,bottom:24};
     const max = Math.ceil(Math.max(1,estimated,...weeks.map(w=>w.total))/50)*50;
     const periods = forecast ? [...weeks,forecast] : weeks;
     const last = periods.length - 1;
@@ -152,9 +152,9 @@
     const viewBox = `0 0 ${width} ${height}`;
     // In the compact chart, scale the line through its own viewport while
     // keeping dots and text sized in CSS pixels for wide and narrow screens.
-    const plotLine = (key,coords) => {
+    const plotLine = (key,coords,area = '') => {
       const line = `<polyline class="traffic-line line-${key}" points="${coords}"${split?'':' vector-effect="non-scaling-stroke"'}></polyline>`;
-      return split ? line : `<svg viewBox="${viewBox}" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">${line}</svg>`;
+      return split ? line : `<svg viewBox="${viewBox}" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">${area}${line}</svg>`;
     };
     const names = {total:'Весь поиск',google:'Google'};
     const point = (week,i,value,key,label) => `<circle class="traffic-point point-${key}" cx="${axisX(x(i))}" cy="${axisY(y(value))}" r="${split?5:3}" tabindex="0" role="img" data-traffic-week="${i}" aria-label="${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов"><title>${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов</title></circle>`;
@@ -162,21 +162,26 @@
     const lines = keys.map(key => {
       const hidden = split && !state.trafficSeries.includes(key) ? ' hidden' : '';
       const coords = weeks.map((week,i)=>coordinates(i,week[key])).join(' ');
-      return `<g data-traffic-line="${key}"${hidden}>${plotLine(key,coords)}${weeks.map((week,i)=>point(week,i,week[key],key,names[key])).join('')}</g>`;
+      const area = split ? '' : `<polygon class="traffic-area" points="${coordinates(0,0)} ${coords} ${coordinates(weeks.length-1,0)}"></polygon>`;
+      return `<g data-traffic-line="${key}"${hidden}>${plotLine(key,coords,area)}${weeks.map((week,i)=>point(week,i,week[key],key,names[key])).join('')}</g>`;
     }).join('');
     const projection = forecast ? plotLine('forecast', `${coordinates(last-1,weeks.at(-1).total)} ${coordinates(last,estimated)}`) + point(forecast,last,estimated,'forecast','Прогноз') : '';
-    const grid = Array.from({length:6},(_,i)=>{
-      const value = max*i/5;
-      return `<line class="traffic-gridline" x1="${axisX(pad.left)}" x2="${axisX(width-pad.right)}" y1="${axisY(y(value))}" y2="${axisY(y(value))}"></line><text class="traffic-axis-label" x="${axisX(pad.left-10)}" y="${axisY(y(value))}" dy=".33em" text-anchor="end">${number(value)}</text>`;
-    }).join('');
+    const ticks = Array.from({length:6},(_,i)=>max*i/5);
+    const grid = ticks.map(value => `<line class="traffic-gridline" x1="${axisX(pad.left)}" x2="${axisX(width-pad.right)}" y1="${axisY(y(value))}" y2="${axisY(y(value))}"></line>`).join('');
+    const yLabels = ticks.map(value => `<text class="traffic-axis-label" x="${split?pad.left-10:'100%'}" y="${axisY(y(value))}" dy=".33em" text-anchor="end">${number(value)}</text>`).join('');
+    const yAxis = split ? '' : `<svg class="traffic-y-axis" aria-hidden="true">${yLabels}</svg>`;
     const labelStep = split ? 4 : 5;
-    const labels = periods.map((week,i)=>i===0 || i===last || (i%labelStep===0 && last-i>1)
-      ? `<text class="traffic-axis-label" x="${axisX(x(i))}" y="${axisY(height-(split?12:7))}" text-anchor="${!split?'middle':i===0?'start':i===last?'end':'middle'}">${trafficDate(week.from)}</text>` : '').join('');
+    const labeled = periods.map((week,i)=>({week,i})).filter(({i})=>i===0 || i===last || (i%labelStep===0 && last-i>1));
+    const labels = labeled.map(({week,i},labelIndex)=>{
+      const nearEdge = !split && labeled.length>3 && (labelIndex===1 || labelIndex===labeled.length-2);
+      const anchor = i===0 ? 'start' : i===last ? 'end' : 'middle';
+      return `<text class="traffic-axis-label${nearEdge?' traffic-date-near-edge':''}" x="${axisX(x(i))}" y="${axisY(height-(split?12:7))}" text-anchor="${anchor}">${trafficDate(week.from)}</text>`;
+    }).join('');
     const legend = split
       ? `<div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${keys.map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div>`
       : `<div class="traffic-legend"><span><i class="series-key" aria-hidden="true"></i>Факт</span>${forecast?'<span><i class="series-key key-forecast" aria-hidden="true"></i>Прогноз</span>':''}</div>`;
     const readout = split ? `<p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p>` : '';
-    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart"${split?` viewBox="${viewBox}"`:''} role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
+    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика">${yAxis}<svg class="traffic-weekly-chart"${split?` viewBox="${viewBox}"`:''} role="group" aria-label="Недельные визиты из поиска">${grid}${split?yLabels:''}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
   }
   function trafficHTML() {
     const traffic = report.traffic;

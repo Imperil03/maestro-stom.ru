@@ -185,10 +185,25 @@
 .traffic-total-only .traffic-legend{margin:0;gap:6px 14px;font-size:12px}
 .traffic-total-only .traffic-legend span{gap:6px}
 .traffic-total-only .series-key{width:16px}
-.traffic-total-only .traffic-chart-scroll{grid-column:1 / -1;margin:0}
-.traffic-total-only .traffic-weekly-chart{height:212px}
-.traffic-total-only .traffic-axis-label{font-size:11px;font-variant-numeric:tabular-nums}
-.traffic-total-only .traffic-line{stroke-width:2}
+.traffic-total-only .traffic-chart-scroll{
+  --plot-height:248px;
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr);
+  grid-column:1 / -1;
+  gap:6px;
+  margin:0;
+  padding-right:4px;
+}
+.traffic-total-only .traffic-weekly-chart,.traffic-y-axis{width:100%;height:var(--plot-height)}
+.traffic-total-only .traffic-axis-label{
+  stroke:none;
+  fill:var(--muted);
+  font-family:inherit;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+.traffic-area{stroke:none;fill:#197d77;fill-opacity:.09}
+.traffic-total-only .traffic-line{stroke-width:2.5}
 .traffic-total-only .traffic-point{stroke-width:1.25}
 .traffic-total-only .traffic-point:hover,.traffic-total-only .traffic-point:focus{r:5;stroke-width:1.5}
 .traffic-total-only .traffic-csv{margin-top:8px;font-size:12px}
@@ -230,8 +245,10 @@
   line-height:1.4;
   font-variant-numeric:tabular-nums;
 }
-.kpi-delta.positive{color:#086952;background:#e8f5ef}
-.kpi-delta.negative{color:#902f3c;background:#faedef}
+.engine-kpi-metric .kpi-values--dated .number.positive,.kpi-delta.positive{color:#086952}
+.engine-kpi-metric .kpi-values--dated .number.negative,.kpi-delta.negative{color:#902f3c}
+.kpi-delta.positive{background:#e8f5ef}
+.kpi-delta.negative{background:#faedef}
 .kpi-delta.neutral{background:var(--page)}
 .engine-kpi-grid--dated .kpi-count{margin-top:6px;font-size:12px;line-height:1.5}
 
@@ -241,7 +258,7 @@
   .traffic-total-only .traffic-weekly-figure figcaption{font-size:13px}
   .traffic-total-only .traffic-legend{gap:4px 8px;font-size:11px}
   .traffic-total-only .series-key{width:12px}
-  .traffic-total-only .traffic-weekly-chart{height:140px}
+  .traffic-total-only .traffic-chart-scroll{--plot-height:168px;grid-template-columns:25px minmax(0,1fr);gap:4px}
   .traffic-total-only .traffic-axis-label{font-size:10px}
   .engine-kpi-grid--dated .engine-kpi-card{padding:16px}
   .engine-kpi-grid--dated .engine-kpi-metrics{gap:12px}
@@ -250,3 +267,4 @@
   .engine-kpi-metric .kpi-values--dated .number{font-size:25px}
   .engine-kpi-metric .kpi-values--dated .number.before{font-size:18px}
 }
+@media(max-width:360px){.traffic-total-only .traffic-date-near-edge{display:none}}
