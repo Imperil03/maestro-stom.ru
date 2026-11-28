@@ -205,11 +205,12 @@
     const numeric = Number(value), band = numeric > 0 && numeric <= 3 ? 'top3' : numeric <= 10 && numeric > 0 ? 'top10' : numeric <= 30 && numeric > 0 ? 'top30' : 'other';
     return `<span class="rank-value rank-${band}">${archive ? esc(value) : number(value)}</span>`;
   }
-  function currentRankCell(value, before) {
-    const change=M.rankDisplayChange(before,value);
+  function currentRankCell(value, before, conditionalBefore) {
+    const change=M.rankDisplayChange(before,value,conditionalBefore);
     const labels={up:`На ${number(change.amount)} позиций выше`,down:`На ${number(change.amount)} позиций ниже`,appeared:'Появился в выдаче',lost:'Вышел за пределы проверки',new:'Новый запрос'};
     const badge=change.kind==='up'?`+${number(change.amount)}`:change.kind==='down'?`−${number(change.amount)}`:change.kind==='appeared'?'↑':change.kind==='lost'?'↓':change.kind==='new'?'нов.':'';
-    return `<span class="rank-position-trend rank-trend-${change.kind}">${rankCell(value)}${badge?`<span class="rank-delta" title="${esc(labels[change.kind])}" aria-label="${esc(labels[change.kind])}">${badge}</span>`:''}</span>`;
+    const label = change.conditionalBefore ? `${badge} от условной позиции ${number(change.conditionalBefore)}` : labels[change.kind];
+    return `<span class="rank-position-trend rank-trend-${change.kind}">${rankCell(value)}${badge?`<span class="rank-delta" title="${esc(label)}" aria-label="${esc(label)}">${badge}</span>`:''}</span>`;
   }
   function queryTableHTML() {
     if (!report.archive && !view) return '';
@@ -239,12 +240,15 @@
       element.setAttribute('aria-label',element.title);
       element.dataset.top10=metric.top10;element.dataset.total=metric.total;
     }
+    const presentation = report.rankings?.presentation;
+    const conditionalRank = presentation?.kpiSummary === 'current_queries' ? presentation.missingRank : undefined;
     $('query-rows').innerHTML=visible.map((row,rowIndex)=>`<tr><th id="query-${rowIndex}" scope="row" class="query-name">${esc(row.query)}</th>${M.ENGINES.map(engine=>positionColumns[engine].map((column,i)=>{
       const original=column.lookup?.get(row.id);
       const value=archive?row[engine][column.key]:original?.[engine];
       const beforeColumn=positionColumns[engine].find(c=>c.role==='before');
-      const before=beforeColumn?.lookup?.get(row.id)?.[engine];
-      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${!archive&&column.role==='after'?currentRankCell(value,before):rankCell(value,!!archive)}</td>`;
+      const prior=beforeColumn?.lookup?.get(row.id);
+      const conditionalBefore = !prior && beforeColumn?.date ? conditionalRank : undefined;
+      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${!archive&&column.role==='after'?currentRankCell(value,prior?.[engine],conditionalBefore):rankCell(value,!!archive)}</td>`;
     }).join('')).join('')}</tr>`).join('');
     $('positions-wrap').hidden=filtered.length===0;$('query-empty').hidden=filtered.length!==0;
     $('query-count').textContent=`Показано: ${visible.length} из ${filtered.length}`;$('show-more').hidden=state.limit>=filtered.length;
