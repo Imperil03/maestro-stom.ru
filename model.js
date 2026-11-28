@@ -25,6 +25,7 @@
     return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
       !Number.isNaN(Date.parse(value)) && new Date(value + 'T12:00:00Z').toISOString().slice(0,10) === value;
   }
+  const forecastVisits = forecast => forecast.observed + forecast.days.reduce((sum, day) => sum + day.visits, 0);
   function rankChange(before, after, comparable, isNew = false) {
     if (!comparable || after === undefined) return {kind:'no_data', amount:null};
     if (isNew || before === undefined) return {kind:'new', amount:null};
@@ -247,11 +248,17 @@
       }
       if (report.traffic) {
         const t = report.traffic;
-        check(Number.isInteger(t.visits) && t.visits >= 0, `${label}: неверное число визитов.`);
-        if (['coverage','periods','weeks','csv','attribution'].some(k => own(t,k))) {
+        const validVisits = n => Number.isInteger(n) && n >= 0;
+        check(validVisits(t.visits), `${label}: неверное число визитов.`);
+        if (['coverage','periods','weeks','csv','attribution','forecast'].some(k => own(t,k))) {
           const day = date => validDate(date) ? Date.parse(date+'T00:00:00Z') / 86400000 : NaN;
-          const validPeriod = p => !!p && validDate(p.from) && validDate(p.to) && p.from <= p.to && ['total','yandex','google','other'].every(k => Number.isInteger(p[k]) && p[k] >= 0) && p.total === p.yandex + p.google + p.other;
-          const before = t.periods?.before, after = t.periods?.after;
+          const channels = ['yandex','google','other'];
+          const {before,after,baseline} = t.periods || {};
+          const split = !!after && channels.some(k => own(after,k));
+          const metrics = split ? ['total',...channels] : ['total'];
+          const validPeriod = p => !!p && validDate(p.from) && validDate(p.to) && p.from <= p.to &&
+            metrics.every(k => validVisits(p[k])) &&
+            (split ? p.total === p.yandex + p.google + p.other : channels.every(k => !own(p,k)));
           check(validDate(t.coverage?.from) && validDate(t.coverage?.to) && t.coverage.from <= t.coverage.to,`${label}: неверный период трафика.`);
           check(typeof t.attribution === 'string' && t.attribution.trim(),`${label}: отсутствует атрибуция трафика.`);
           check(typeof t.csv === 'string' && t.csv.startsWith('evidence/') && /\.csv$/.test(t.csv) && safeHref(t.csv) === t.csv,`${label}: неверное приложение трафика.`);
@@ -259,6 +266,10 @@
           if (validPeriod(before) && validPeriod(after)) {
             check(day(before.to) + 1 === day(after.from) && day(before.to) - day(before.from) === day(after.to) - day(after.from),`${label}: периоды трафика должны быть последовательными и одинаковой длины.`);
             check(t.visits === after.total,`${label}: число визитов не совпадает с текущим периодом.`);
+          }
+          if (own(t.periods || {},'baseline')) {
+            check(validPeriod(baseline) && baseline.to < before?.from
+              && day(baseline.to) - day(baseline.from) === day(after?.to) - day(after?.from), `${label}: несопоставимый базовый период трафика.`);
           }
           check(Array.isArray(t.weeks) && t.weeks.length > 0,`${label}: нет недельной истории трафика.`);
           if (Array.isArray(t.weeks) && t.weeks.length) {
@@ -268,10 +279,18 @@
               if (i) check(day(t.weeks[i-1].to) + 1 === day(w.from),`${label}: пропуск или пересечение недель трафика.`);
             }
             check(t.weeks[0].from === t.coverage?.from && t.weeks.at(-1).to === t.coverage?.to,`${label}: границы недель не совпадают с покрытием трафика.`);
-            for (const p of [before,after].filter(validPeriod)) {
+            for (const p of [baseline,before,after].filter(validPeriod)) {
               const included = t.weeks.filter(w => w.from >= p.from && w.to <= p.to);
-              check(included[0]?.from === p.from && included.at(-1)?.to === p.to && ['total','yandex','google','other'].every(k => included.reduce((sum,w) => sum + w[k],0) === p[k]),`${label}: итог периода трафика не совпадает с неделями.`);
+              check(included[0]?.from === p.from && included.at(-1)?.to === p.to && metrics.every(k => included.reduce((sum,w) => sum + w[k],0) === p[k]),`${label}: итог периода трафика не совпадает с неделями.`);
             }
+          }
+          if (own(t,'forecast')) {
+            const f = t.forecast;
+            check(!!f && !split && day(f.from) === day(t.coverage?.to) + 1 && day(f.to) === day(f.from) + 6
+              && day(f.observedThrough) >= day(f.from) && day(f.observedThrough) < day(f.to) && validVisits(f.observed)
+              && Array.isArray(f.days) && f.days.length === day(f.to) - day(f.observedThrough)
+              && f.days.every((d,i) => day(d?.date) === day(f.observedThrough) + i + 1 && validVisits(d.visits))
+              && typeof f.method === 'string' && f.method.trim(), `${label}: прогноз должен дополнять неполную неделю после факта.`);
           }
         }
       }
@@ -313,5 +332,5 @@
     }
     return errors;
   }
-  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, normalize, displayRank, rankDisplayChange, rankVisibility, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
+  return {ENGINES, months, monthLabel, getReport, defaultMonth, safeHref, safeImageHref, validDate, forecastVisits, normalize, displayRank, rankDisplayChange, rankVisibility, rankChange, comparisonSettings, rankingsView, filterRows, validateData};
 });

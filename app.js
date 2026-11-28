@@ -18,7 +18,16 @@
   const hasWorkDetails = month => month >= '2026-10';
   const state = {month:M.defaultMonth(data),tab:'works',detail:null,filters:{search:'',direction:'',trend:'all'},limit:25,engine:'yandex',cohort:'all',trafficSeries:['total','google']};
   let view = null, report = null, positionColumns = null, renderedMonth = null, currentDetail = null, lastOpener = null;
-  const linkHTML = item => M.safeHref(item.url) ? `<a href="${esc(M.safeHref(item.url))}" target="_blank" rel="noopener noreferrer">${esc(item.label || item.url)}${icon('external')}</a>` : esc(item.label || 'Ссылка недоступна');
+  const imageDialog = $('image-dialog');
+  let imageOpener = null;
+  function linkHTML(item) {
+    const href = M.safeHref(item.url);
+    const label = esc(item.label || item.url);
+    if (!href) return esc(item.label || 'Ссылка недоступна');
+    const isImage = M.safeImageHref(href);
+    const attrs = isImage ? `data-image-preview="${label}" aria-haspopup="dialog"` : 'target="_blank"';
+    return `<a href="${esc(href)}" ${attrs} rel="noopener noreferrer">${label}${isImage?'':icon('external')}</a>`;
+  }
   function readRoute() {
     const url = new URL(location.href), month = url.searchParams.get('month'), tab = url.hash.slice(1);
     return {month:months.includes(month) ? month : M.defaultMonth(data), tab:tabs.includes(tab) ? tab : 'works', detail:url.searchParams.get('work')};
@@ -81,25 +90,69 @@
       return `<section class="ranking-chart surface" aria-label="${name}: ${archive ? 'доли запросов по архивной сводке' : 'количество запросов'}"><h3>${name}</h3>${archive ? '<p class="archive-chart-note">Доли запросов по сводке архивного отчёта</p>' : ''}<div class="rank-bars">${bars}</div><div class="chart-legend">${comparable ? `<span><i class="before-key"></i>Было${archive ? '' : ' · ' + dateLabel(view.before.date)}</span>` : ''}<span><i></i>${comparable ? 'Стало' : 'Сейчас'}${archive ? '' : ' · ' + dateLabel(view.after.date)}</span></div></section>`;
     }).join('')}</div>`;
   }
-  function trafficHTML() {
-    if(!report.traffic)return '';
-    const traffic=report.traffic;
-    if(!traffic.periods||!traffic.weeks?.length)return `<section class="traffic-card surface"><div><h3>Поисковый трафик</h3><p class="traffic-value">${number(traffic.visits)}<span>визитов</span></p></div></section>`;
-    const {before,after}=traffic.periods,period=value=>`${dateLabel(value.from).slice(0,5)}–${dateLabel(value.to)}`;
-    const metric=(key,label)=>{
-      const delta=after[key]-before[key],percent=before[key]?delta/before[key]*100:null;
-      return `<div class="traffic-metric"><h4>${label}</h4><div class="traffic-totals"><span>${number(before[key])}</span>${icon('arrow')}<strong>${number(after[key])}</strong></div><p class="${delta>0?'positive':delta<0?'negative':'neutral'}">${percent===null?'Нет сопоставимой базы':`${delta>0?'+':''}${number(percent)}%`}<span> · ${delta>0?'+':''}${number(delta)} визитов</span></p></div>`;
-    };
-    const weeks=traffic.weeks,W=900,H=300,pad={left:48,right:28,top:24,bottom:50},max=Math.ceil(Math.max(1,...weeks.map(w=>w.total))/50)*50;
-    const x=i=>pad.left+i*(W-pad.left-pad.right)/Math.max(1,weeks.length-1),y=v=>H-pad.bottom-v/max*(H-pad.top-pad.bottom);
-    const names={total:'Весь поиск',google:'Google'};
-    const lines=['total','google'].map(key=>`<g data-traffic-line="${key}"${state.trafficSeries.includes(key)?'':' hidden'}><polyline class="traffic-line line-${key}" points="${weeks.map((w,i)=>`${x(i)},${y(w[key])}`).join(' ')}"></polyline>${weeks.map((w,i)=>`<circle class="traffic-point point-${key}" cx="${x(i)}" cy="${y(w[key])}" r="5" tabindex="0" role="img" data-traffic-week="${i}" aria-label="${esc(names[key])}, ${period(w)}: ${number(w[key])} визитов"><title>${esc(names[key])}: ${number(w[key])} · ${period(w)}</title></circle>`).join('')}</g>`).join('');
-    const grid=Array.from({length:6},(_,i)=>{const value=max*i/5;return `<line class="traffic-gridline" x1="${pad.left}" x2="${W-pad.right}" y1="${y(value)}" y2="${y(value)}"></line><text class="traffic-axis-label" x="${pad.left-12}" y="${y(value)+5}" text-anchor="end">${number(value)}</text>`;}).join('');
-    const labels=weeks.map((w,i)=>i%4===0||i===weeks.length-1?`<text class="traffic-axis-label" x="${x(i)}" y="${H-18}" text-anchor="${i===0?'start':i===weeks.length-1?'end':'middle'}">${dateLabel(w.from).slice(0,5)}</text>`:'').join('');
-    return `<section class="traffic-card traffic-report surface" aria-labelledby="traffic-heading"><div class="traffic-report-heading"><h3 id="traffic-heading">Поисковый трафик</h3></div><div class="traffic-metric-grid">${metric('total','Все поисковые системы')}${metric('google','Google')}</div><figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption><div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${['total','google'].map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div><div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart" viewBox="0 0 ${W} ${H}" role="group" aria-label="Недельные визиты из поиска и Google">${grid}${lines}${labels}</svg></div><p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${trafficWeekText(weeks.at(-1))}</p></figure>${M.safeHref(traffic.csv)?`<p class="traffic-csv">${linkHTML({url:traffic.csv,label:'Скачать данные о поисковом трафике (CSV)'})}</p>`:''}</section>`;
+  const trafficDate = date => dateLabel(date).slice(0,5);
+  const trafficPeriod = period => `${trafficDate(period.from)}–${trafficDate(period.to)}`;
+  const signed = value => `${value>0?'+':value<0?'−':''}${number(Math.abs(value))}`;
+  const visitCount = new Intl.PluralRules('ru-RU');
+  function trafficMetric(label, before, after, key, dated = false) {
+    const delta = after[key] - before[key];
+    const percent = before[key] ? delta / before[key] * 100 : null;
+    const dates = dated ? `<small class="traffic-date-pair">${trafficPeriod(before)} → ${trafficPeriod(after)}</small>` : '';
+    const unit = {one:'визит',few:'визита',many:'визитов'}[visitCount.select(Math.abs(delta))];
+    return `<div class="traffic-metric"><h4>${label}</h4><div class="traffic-totals"><span>${number(before[key])}</span>${icon('arrow')}<strong>${number(after[key])}</strong></div><p class="${delta>0?'positive':delta<0?'negative':'neutral'}">${percent===null?'Нет сопоставимой базы':signed(percent)+'%'}<span> · ${signed(delta)} ${unit}</span></p>${dates}</div>`;
   }
   function trafficWeekText(week) {
-    return week?`${dateLabel(week.from).slice(0,5)}–${dateLabel(week.to)}: весь поиск — ${number(week.total)}, Google — ${number(week.google)} визитов.`:'';
+    if (week.days) {
+      const projected = M.forecastVisits(week);
+      return `${trafficPeriod(week)} · ${number(projected)} визитов (прогноз). ${number(week.observed)} фактически за ${trafficDate(week.from)}–${trafficDate(week.observedThrough)} и ${number(projected-week.observed)} по прогнозу на выходные.`;
+    }
+    const split = Number.isInteger(week.google) ? ` · Google ${number(week.google)}` : '';
+    return `${trafficPeriod(week)} · ${number(week.total)} визитов из поиска${split}.`;
+  }
+  function trafficChart(traffic, split) {
+    const {weeks,forecast} = traffic;
+    const estimated = forecast ? M.forecastVisits(forecast) : 0;
+    const width = 900, height = split ? 300 : 348;
+    const pad = {left:split?48:74,right:30,top:24,bottom:46};
+    const max = Math.ceil(Math.max(1,estimated,...weeks.map(w=>w.total))/50)*50;
+    const periods = forecast ? [...weeks,forecast] : weeks;
+    const last = periods.length - 1;
+    const x = i => pad.left + i * (width - pad.left - pad.right) / Math.max(1,last);
+    const y = v => height - pad.bottom - v/max * (height-pad.top-pad.bottom);
+    const coordinates = (i,value) => `${x(i)},${y(value)}`;
+    const names = {total:'Весь поиск',google:'Google'};
+    const point = (week,i,value,key,label) => `<circle class="traffic-point point-${key}" cx="${x(i)}" cy="${y(value)}" r="5" tabindex="0" role="img" data-traffic-week="${i}" aria-label="${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов"><title>${esc(label)} · ${number(value)} визитов</title></circle>`;
+    const keys = split ? ['total','google'] : ['total'];
+    const lines = keys.map(key => {
+      const hidden = split && !state.trafficSeries.includes(key) ? ' hidden' : '';
+      const coords = weeks.map((week,i)=>coordinates(i,week[key])).join(' ');
+      return `<g data-traffic-line="${key}"${hidden}><polyline class="traffic-line line-${key}" points="${coords}"></polyline>${weeks.map((week,i)=>point(week,i,week[key],key,names[key])).join('')}</g>`;
+    }).join('');
+    const projection = forecast ? `<polyline class="traffic-line line-forecast" points="${coordinates(last-1,weeks.at(-1).total)} ${coordinates(last,estimated)}"></polyline>${point(forecast,last,estimated,'forecast','Прогноз')}` : '';
+    const grid = Array.from({length:6},(_,i)=>{
+      const value = max*i/5;
+      return `<line class="traffic-gridline" x1="${pad.left}" x2="${width-pad.right}" y1="${y(value)}" y2="${y(value)}"></line><text class="traffic-axis-label" x="${pad.left-12}" y="${y(value)+5}" text-anchor="end">${number(value)}</text>`;
+    }).join('');
+    const labelStep = split ? 4 : 5;
+    const labels = periods.map((week,i)=>i===0 || i===last || (i%labelStep===0 && last-i>1)
+      ? `<text class="traffic-axis-label" x="${x(i)}" y="${height-12}" text-anchor="${i===0?'start':i===last?'end':'middle'}">${trafficDate(week.from)}</text>` : '').join('');
+    const legend = split
+      ? `<div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${keys.map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div>`
+      : `<div class="traffic-legend"><span><i class="series-key" aria-hidden="true"></i>Факт</span>${forecast?'<span><i class="series-key key-forecast" aria-hidden="true"></i>Прогноз</span>':''}</div>`;
+    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div><p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p></figure>`;
+  }
+  function trafficHTML() {
+    const traffic = report.traffic;
+    if (!traffic) return '';
+    if (!traffic.periods || !traffic.weeks?.length) return `<section class="traffic-card surface"><div><h3>Поисковый трафик</h3><p class="traffic-value">${number(traffic.visits)}<span>визитов</span></p></div></section>`;
+    const {baseline,before,after} = traffic.periods;
+    const split = Number.isInteger(after.google);
+    const main = trafficMetric(baseline?'К первым четырём неделям июня':'Все поисковые системы',baseline||before,after,'total',!!baseline);
+    const second = split ? trafficMetric('Google',before,after,'google')
+      : baseline ? trafficMetric('К предыдущим четырём неделям',before,after,'total',true) : '';
+    const source = split ? '' : `<p class="traffic-source">${esc(traffic.sourceLabel)} · ${esc(traffic.attribution)}. ${esc(traffic.forecast?.method || '')}</p>`;
+    const csv = M.safeHref(traffic.csv) ? `<p class="traffic-csv">${linkHTML({url:traffic.csv,label:'Скачать данные о поисковом трафике (CSV)'})}</p>` : '';
+    return `<section class="traffic-card traffic-report${split?'':' traffic-total-only'} surface" aria-labelledby="traffic-heading"><div class="traffic-report-heading"><h3 id="traffic-heading">Поисковый трафик</h3></div><div class="traffic-metric-grid">${main}${second}</div>${trafficChart(traffic,split)}${source}${csv}</section>`;
   }
   function scopeHTML() {
     if(!report.rankings?.cohorts?.length||!view||view.pending)return '';
@@ -179,7 +232,7 @@
     let body = '';
     const hasImages = item.type === 'comparison' && M.safeImageHref(item.beforeImage) && M.safeImageHref(item.afterImage);
     if (item.type === 'comparison') {
-      const sideHTML = (side,label) => `<div><h4>${label}</h4>${item[side] ? `<p>${esc(item[side])}</p>` : ''}${hasImages ? `<figure class="comparison-screenshot"><a href="${esc(item[side + 'Image'])}" target="_blank" rel="noopener noreferrer" aria-label="${label}: открыть снимок в полном размере"><img src="${esc(item[side + 'Image'])}" alt="${esc(item[side + 'Alt'])}" loading="lazy" decoding="async"></a><figcaption>Нажмите на снимок, чтобы открыть его в полном размере.</figcaption></figure>` : ''}</div>`;
+      const sideHTML = (side,label) => `<div><h4>${label}</h4>${item[side] ? `<p>${esc(item[side])}</p>` : ''}${hasImages ? `<figure class="comparison-screenshot"><a href="${esc(item[side + 'Image'])}" data-image-preview="${esc(item[side + 'Alt'])}" rel="noopener noreferrer" aria-haspopup="dialog" aria-label="${label}. Увеличить снимок"><img src="${esc(item[side + 'Image'])}" alt="${esc(item[side + 'Alt'])}" loading="lazy" decoding="async"></a><figcaption>Нажмите на снимок, чтобы увеличить.</figcaption></figure>` : ''}</div>`;
       body = `<div class="comparison-grid${hasImages ? ' has-images' : ''}">${sideHTML('before','Было')}${sideHTML('after','Стало')}</div>`;
     }
     if (item.type === 'table') body = tableHTML(item);
@@ -194,6 +247,7 @@
   function renderDetail() {
     const work = state.tab === 'works' && hasWorkDetails(state.month) && report.works.find(w => w.id === state.detail);
     const key = work ? `${state.month}:${work.id}` : null;
+    if (imageDialog.open && currentDetail !== key) imageDialog.close();
     if (!work) {
       if (dialog.open) { dialog.close(); document.body.classList.remove('dialog-open'); (lastOpener?.isConnected ? lastOpener : $('tab-' + state.tab)).focus({preventScroll:true}); }
       currentDetail = null; return;
@@ -228,6 +282,17 @@
     });
   });
   document.addEventListener('click',event => {
+    const image = event.target.closest('a[data-image-preview]');
+    const imageSource = image && M.safeImageHref(image.getAttribute('href'));
+    if (imageSource && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      imageOpener = image;
+      $('image-dialog-title').textContent = image.dataset.imagePreview || 'Снимок экрана';
+      $('expanded-image').alt = image.dataset.imagePreview || '';
+      $('expanded-image').src = imageSource;
+      imageDialog.showModal();
+      return;
+    }
     const work = event.target.closest('[data-work]'); if (work) { lastOpener = work; navigate({detail:work.dataset.work}); return; }
     const scope=event.target.closest('button[data-rank-scope]');
     if(scope){
@@ -260,13 +325,32 @@
   }
   function showTrafficPoint(event){
     const point=event.target.closest?.('[data-traffic-week]');
-    if(point&&$('traffic-point-readout'))$('traffic-point-readout').textContent=trafficWeekText(report.traffic.weeks[Number(point.dataset.trafficWeek)]);
+    const readout=$('traffic-point-readout');
+    if (point && readout) {
+      const index = Number(point.dataset.trafficWeek);
+      const week = report.traffic.weeks[index] || report.traffic.forecast;
+      if (week) readout.textContent = trafficWeekText(week);
+    }
   }
   document.addEventListener('pointerover',showTrafficPoint);
   document.addEventListener('focusin',showTrafficPoint);
   $('close-detail').addEventListener('click',() => navigate({detail:null}));
   dialog.addEventListener('cancel',event => { event.preventDefault(); navigate({detail:null}); });
-  dialog.addEventListener('click',event => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) navigate({detail:null}); } });
+  function closeOnBackdrop(modal, close) {
+    modal.addEventListener('click',event => {
+      if (event.target !== modal) return;
+      const r = modal.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close();
+    });
+  }
+  closeOnBackdrop(dialog,() => navigate({detail:null}));
+  closeOnBackdrop(imageDialog,() => imageDialog.close());
+  $('close-image').addEventListener('click',() => imageDialog.close());
+  imageDialog.addEventListener('close',() => {
+    $('expanded-image').removeAttribute('src');
+    if (dialog.open && imageOpener?.isConnected) imageOpener.focus({preventScroll:true});
+    imageOpener = null;
+  });
   function restoreRoute() { navigate(readRoute(),{replace:true}); }
   window.addEventListener('popstate',restoreRoute); window.addEventListener('hashchange',restoreRoute);
   navigate(readRoute(),{replace:true});

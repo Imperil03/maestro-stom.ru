@@ -9,11 +9,11 @@
   <link rel="preload" href="assets/fonts/Montserrat-Regular.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/Montserrat-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css?v=cc033ab2f32f">
-  <link rel="stylesheet" href="results.css?v=b3db0bb38198">
-  <link rel="stylesheet" href="adapt.css?v=3fc158f25cd5">
-  <script src="report-data.js?v=ca00066c23f5" defer></script>
-  <script src="model.js?v=8aa0a00b47e7" defer></script>
-  <script src="app.js?v=604b0b80812c" defer></script>
+  <link rel="stylesheet" href="results.css?v=59848606689e">
+  <link rel="stylesheet" href="adapt.css?v=319d5d56309d">
+  <script src="report-data.js?v=d38454bb019d" defer></script>
+  <script src="model.js?v=a06b6958da15" defer></script>
+  <script src="app.js?v=d9c6d161ad7d" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#report-content">К содержанию отчёта</a>
@@ -38,6 +38,13 @@
   <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title">
     <div class="drawer-header"><div><h2 id="detail-title"></h2><p id="detail-meta"></p></div><button type="button" id="close-detail" class="icon-button" aria-label="Закрыть подробности" autofocus><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div id="detail-body" class="drawer-body"></div>
+  </dialog>
+  <dialog id="image-dialog" class="detail-dialog image-dialog" aria-labelledby="image-dialog-title">
+    <div class="drawer-header">
+      <h2 id="image-dialog-title">Снимок экрана</h2>
+      <button type="button" id="close-image" class="icon-button" aria-label="Закрыть снимок" autofocus><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="image-dialog-body"><img id="expanded-image" alt=""></div>
   </dialog>
   <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
 </body>

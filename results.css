@@ -66,6 +66,7 @@
 .traffic-totals>svg{width:24px;height:24px;color:var(--muted)}
 .traffic-metric>p{font-size:23px;font-weight:600;margin-top:10px}
 .traffic-metric>p>span{font-size:15px;font-weight:400;color:var(--muted)}
+.traffic-date-pair{display:block;margin-top:8px;font-size:13px;color:var(--muted)}
 .traffic-weekly-figure{margin:30px 0 0;border-top:1px solid var(--line);padding-top:24px}
 .traffic-weekly-figure figcaption{font-size:18px;font-weight:600;line-height:1.6}
 .traffic-series-switch{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
@@ -81,6 +82,13 @@
 .traffic-line{stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .line-total{stroke:#197d77}
 .line-google{stroke:#5953cf;stroke-dasharray:7 4}
+.line-forecast{stroke:#805ab7;stroke-dasharray:8 6}
+.point-forecast{fill:#805ab7}
+.traffic-legend{display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:14px;color:var(--muted);font-size:14px}
+.traffic-legend span{display:inline-flex;align-items:center;gap:9px}
+.key-forecast{height:0;background:none;border-top:2px dashed #805ab7}
+.traffic-total-only .traffic-weekly-chart{min-width:0}
+.traffic-source{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.65}
 .traffic-point{stroke:#fff;stroke-width:2;cursor:crosshair}
 .point-total{fill:#197d77}
 .point-google{fill:#5953cf}
@@ -89,6 +97,11 @@
 .traffic-csv{font-size:15px;margin-top:24px}
 .traffic-csv a{display:inline-flex;align-items:center;gap:9px;overflow-wrap:anywhere}
 .traffic-csv svg{width:18px;height:18px}
+@media(max-width:600px){
+  .traffic-total-only .traffic-axis-label{font-size:28px}
+  .traffic-total-only .traffic-point{r:8}
+  .traffic-total-only .traffic-point:hover,.traffic-total-only .traffic-point:focus{r:11}
+}
 @media(max-width:900px){.rank-scope{display:block}.scope-options{justify-content:flex-start;margin-top:20px}.ranking-chart .rank-bars{gap:18px}.ranking-chart .rank-bar-group{gap:8px}.ranking-chart .rank-bar{width:38px}.traffic-report-heading{display:block}.traffic-report-heading>p{margin-top:16px}}
 @media(max-width:600px){.rank-scope,.ranking-history{padding:24px}.scope-options{display:grid;grid-template-columns:minmax(0,1fr)}.scope-options button{width:100%;text-align:left}.rank-scope h3{font-size:18px}.ranking-summary{font-size:14px;padding:18px 20px}.traffic-metric-grid{grid-template-columns:1fr;gap:28px}.traffic-metric-grid>.traffic-metric+.traffic-metric{border-top:1px solid var(--line);padding-top:24px}.traffic-totals>strong{font-size:40px}.traffic-report-heading>p{font-size:14px}.traffic-chart-hint{display:block}.traffic-point-readout{font-size:13px;min-height:44px}.ranking-chart .rank-bars{gap:12px}.ranking-chart .rank-bar-group{gap:6px}.ranking-chart .rank-bar{width:28px}.ranking-chart .rank-bar span{font-size:13px}.history-note,.history-profile{font-size:13px}.ranking-history summary,.traffic-details summary{font-size:15px}.engine-population,.current-top30,.engine-movement{font-size:13px}}
 @media(max-width:900px){.engine-kpi-grid{gap:24px}.engine-kpi-card{padding:28px}.engine-kpi-metrics{gap:20px}.engine-kpi-metric+.engine-kpi-metric{padding-left:20px}.competitors-card{padding:28px}.competitors-table thead th:first-child{width:34%}.competitors-table th,.competitors-table td{padding:18px 10px}.comparison-value{font-size:24px}}
