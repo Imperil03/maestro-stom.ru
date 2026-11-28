@@ -91,8 +91,10 @@
   function engineKpisHTML() {
     const cards = M.ENGINES.map(engine => {
       const name = engine === 'yandex' ? 'Яндекс' : 'Google';
-      const count = summary?.counts[engine].after.total;
-      const scope = count ? `<span class="engine-query-count">${number(count)} общих запросов</span>` : '';
+      const coverage = summary?.counts[engine];
+      const missing = coverage ? coverage.before.total - coverage.before.measured : 0;
+      const scopeTitle = missing ? ` title="${number(missing)} без замера на ${trafficDate(summary.before.date)} учтены условно как 101"` : '';
+      const scope = coverage ? `<span class="engine-query-count"${scopeTitle}>${number(coverage.after.total)} запросов</span>` : '';
       const title = `<h3 class="searcher-name" id="kpi-heading-${engine}">${name}</h3>`;
       const heading = summary ? `<div class="engine-kpi-heading">${title}${scope}</div>` : title;
       return `<section class="engine-kpi-card surface engine-${engine}" aria-labelledby="kpi-heading-${engine}">${heading}<div class="engine-kpi-metrics">${[10,3].map(top=>kpiHTML(engine,top)).join('')}</div></section>`;
@@ -253,7 +255,10 @@
     let intro=report.intro.map(detailParagraphsHTML).join('');
     if(report.conclusions.length)intro+=report.conclusions.map(detailParagraphsHTML).join('');
     const heading=`<div class="results-heading"><h2>Результаты за ${M.monthLabel(state.month).toLowerCase()}</h2>${intro?`<div class="results-intro">${intro}</div>`:''}</div>`;
-    return heading+(report.archive||(view&&!view.pending)?trafficHTML()+scopeHTML()+engineKpisHTML()+rankCharts()+queryTableHTML():trafficHTML()+(view?queryTableHTML():pendingHTML('results')));
+    if (report.archive || (view && !view.pending)) {
+      return heading + trafficHTML() + scopeHTML() + engineKpisHTML() + (summary ? '' : rankCharts()) + queryTableHTML();
+    }
+    return heading + trafficHTML() + (view ? queryTableHTML() : pendingHTML('results'));
   }
   function worksHTML() {
     if (!report.works.length) return pendingHTML('works');

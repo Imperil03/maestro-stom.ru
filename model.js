@@ -74,31 +74,50 @@
     const top10 = values.filter(value => Number.isInteger(value) && value >= 1 && value <= 10).length;
     return {total,top10,percent:total ? top10 / total * 100 : null,measured:values.filter(value => value !== undefined).length};
   }
+  function countRanks(values) {
+    return {
+      total:values.length,
+      measured:values.filter(value => value !== undefined).length,
+      top3:values.filter(value => Number.isInteger(value) && value >= 1 && value <= 3).length,
+      top10:values.filter(value => Number.isInteger(value) && value >= 1 && value <= 10).length
+    };
+  }
   function engineCounts(rows, engine) {
     return Object.fromEntries(['start','before','after'].map(side => {
       const values = rows.map(row => row[engine]?.[side]);
-      return [side,{total:rows.length,measured:values.filter(value => value !== undefined).length,
-        top3:values.filter(value => typeof value === 'number' && value <= 3).length,
-        top10:values.filter(value => typeof value === 'number' && value <= 10).length}];
+      return [side,countRanks(values)];
     }));
   }
   function snapshotCounts(rows) {
     return Object.fromEntries(ENGINES.map(engine => [engine,engineCounts(rows,engine)]));
   }
-  function rankingsSummary(rankings, options) {
-    const before = rankings?.kpiBaseline;
-    if (!before || !rankings.after) return null;
-    const comparison = rankingsView({...rankings,before,reference:null},options);
+  function findCohort(rankings, cohort) {
+    const selected = cohort === 'all' ? null : rankings?.cohorts?.find(c => c.id === cohort);
+    if (cohort !== 'all' && !selected) throw new RangeError('Неизвестная выборка запросов.');
+    return selected;
+  }
+  function rankingsSummary(rankings, {cohort = 'all'} = {}) {
+    const before = rankings?.kpiBaseline, after = rankings?.after;
+    if (!before || !after) return null;
+    const selected = findCohort(rankings,cohort);
+    const ids = selected ? new Set(selected.queryIds) : null;
+    const currentRows = ids ? after.rows.filter(row => ids.has(row.id)) : after.rows;
+    const previous = new Map(before.rows.map(row => [row.id,row]));
     const counts = Object.fromEntries(ENGINES.map(engine => {
-      const paired = comparison.rows.filter(row => !row.isNew && row[engine].before !== undefined && row[engine].after !== undefined);
-      return [engine,engineCounts(paired,engine)];
+      const measured = currentRows.filter(row => row[engine] !== undefined);
+      const prior = measured.map(row => {
+        const match = previous.get(row.id);
+        return match && normalize(match.query) === normalize(row.query) ? match[engine] : undefined;
+      });
+      // Untracked queries count toward the comparison set but cannot enter a
+      // historical top: undefined stays distinct from an observed rank.
+      return [engine,{before:countRanks(prior),after:countRanks(measured.map(row => row[engine]))}];
     }));
-    return {before,after:rankings.after,counts,comparisons:comparison.comparisons};
+    return {before,after,counts};
   }
   function rankingsView(rankings, {cohort = 'all'} = {}) {
     const monthlyComparison = rankings?.presentation?.comparison === 'previous_month';
-    const selected = cohort === 'all' ? null : rankings?.cohorts?.find(c => c.id === cohort);
-    if (cohort !== 'all' && !selected) throw new RangeError('Неизвестная выборка запросов.');
+    const selected = findCohort(rankings,cohort);
     const selectedIds = selected ? new Set(selected.queryIds) : null;
     const scoped = rows => selectedIds ? rows.filter(row => selectedIds.has(row.id)) : rows;
     const scope = selected ? {id:selected.id,label:selected.label,queryIds:[...selected.queryIds]} : {id:'all',label:'Все запросы'};
