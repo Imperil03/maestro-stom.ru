@@ -179,11 +179,25 @@
       const anchor = i===0 ? 'start' : i===last ? 'end' : 'middle';
       return `<text class="traffic-axis-label${nearEdge?' traffic-date-near-edge':''}" x="${axisX(x(i))}" y="${axisY(height-(split?12:7))}" text-anchor="${anchor}">${trafficDate(week.from)}</text>`;
     }).join('');
+    let values = '';
+    if (!split) {
+      const lastFact = weeks.length - 1;
+      const peak = weeks.reduce((index, week, i) => week.total > weeks[index].total ? i : index,0);
+      const valueLabel = (i, value, projected = false) => {
+        const anchor = i === 0 ? 'start' : i >= lastFact ? 'end' : 'middle';
+        const dx = anchor === 'start' ? 6 : anchor === 'end' ? -4 : 0;
+        const position = y(value);
+        const below = position < pad.top + 14 || (forecast && i === lastFact && position < height - 42);
+        return `<text class="traffic-value-label${projected?' traffic-value-forecast':''}" x="${axisX(x(i))}" y="${axisY(position)}" dx="${dx}" dy="${below?14:-8}" text-anchor="${anchor}" aria-hidden="true">${number(value)}</text>`;
+      };
+      values = [...new Set([0,peak,lastFact])].map(i=>valueLabel(i,weeks[i].total)).join('');
+      if (forecast) values += valueLabel(last,estimated,true);
+    }
     const legend = split
       ? `<div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${keys.map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div>`
       : `<div class="traffic-legend"><span><i class="series-key" aria-hidden="true"></i>Факт</span>${forecast?'<span><i class="series-key key-forecast" aria-hidden="true"></i>Прогноз</span>':''}</div>`;
     const readout = split ? `<p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p>` : '';
-    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика">${yAxis}<svg class="traffic-weekly-chart"${split?` viewBox="${viewBox}"`:''} role="group" aria-label="Недельные визиты из поиска">${grid}${split?yLabels:''}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
+    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика">${yAxis}<svg class="traffic-weekly-chart"${split?` viewBox="${viewBox}"`:''} role="group" aria-label="Недельные визиты из поиска">${grid}${split?yLabels:''}${lines}${projection}${labels}${values}</svg></div>${readout}</figure>`;
   }
   function trafficHTML() {
     const traffic = report.traffic;
@@ -205,11 +219,11 @@
     const numeric = Number(value), band = numeric > 0 && numeric <= 3 ? 'top3' : numeric <= 10 && numeric > 0 ? 'top10' : numeric <= 30 && numeric > 0 ? 'top30' : 'other';
     return `<span class="rank-value rank-${band}">${archive ? esc(value) : number(value)}</span>`;
   }
-  function currentRankCell(value, before, conditionalBefore) {
-    const change=M.rankDisplayChange(before,value,conditionalBefore);
+  function currentRankCell(value, before, conditionalRank) {
+    const change=M.rankDisplayChange(before,value,conditionalRank);
     const labels={up:`На ${number(change.amount)} позиций выше`,down:`На ${number(change.amount)} позиций ниже`,appeared:'Появился в выдаче',lost:'Вышел за пределы проверки',new:'Новый запрос'};
     const badge=change.kind==='up'?`+${number(change.amount)}`:change.kind==='down'?`−${number(change.amount)}`:change.kind==='appeared'?'↑':change.kind==='lost'?'↓':change.kind==='new'?'нов.':'';
-    const label = change.conditionalBefore ? `${badge} от условной позиции ${number(change.conditionalBefore)}` : labels[change.kind];
+    const label = change.conditionalRank ? `${badge} с учётом условной позиции ${number(change.conditionalRank)}` : labels[change.kind];
     return `<span class="rank-position-trend rank-trend-${change.kind}">${rankCell(value)}${badge?`<span class="rank-delta" title="${esc(label)}" aria-label="${esc(label)}">${badge}</span>`:''}</span>`;
   }
   function queryTableHTML() {
@@ -247,8 +261,8 @@
       const value=archive?row[engine][column.key]:original?.[engine];
       const beforeColumn=positionColumns[engine].find(c=>c.role==='before');
       const prior=beforeColumn?.lookup?.get(row.id);
-      const conditionalBefore = !prior && beforeColumn?.date ? conditionalRank : undefined;
-      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${!archive&&column.role==='after'?currentRankCell(value,prior?.[engine],conditionalBefore):rankCell(value,!!archive)}</td>`;
+      const comparisonRank = beforeColumn?.date ? conditionalRank : undefined;
+      return `<td headers="query-${rowIndex} engine-${engine} rank-${engine}-${column.key}" class="engine-${engine} period-${column.role} ${i===0?'engine-start':''} ${column.role==='after'?'current':''}">${!archive&&column.role==='after'?currentRankCell(value,prior?.[engine],comparisonRank):rankCell(value,!!archive)}</td>`;
     }).join('')).join('')}</tr>`).join('');
     $('positions-wrap').hidden=filtered.length===0;$('query-empty').hidden=filtered.length!==0;
     $('query-count').textContent=`Показано: ${visible.length} из ${filtered.length}`;$('show-more').hidden=state.limit>=filtered.length;

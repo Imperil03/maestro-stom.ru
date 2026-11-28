@@ -57,18 +57,18 @@
   const sameSettings = (before,after,engine) => comparisonSettings(before,after,engine).comparable;
   const withinDepth = (value,depth) => typeof value === 'number' && depth && value > depth ? null : value;
   const displayRank = (value, missingRank = 101) => typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : missingRank;
-  function rankDisplayChange(before, after, conditionalBefore) {
+  function rankDisplayChange(before, after, conditionalRank) {
     const measured = value => Number.isInteger(value) && value > 0;
-    const hasAfter = measured(after);
-    const usesConditional = before === undefined && hasAfter && measured(conditionalBefore);
-    const baseline = usesConditional ? conditionalBefore : before;
-    if (measured(baseline) && hasAfter) {
-      const delta = baseline - after;
+    const usePlaceholder = measured(conditionalRank);
+    const baseline = usePlaceholder ? displayRank(before,conditionalRank) : before;
+    const current = usePlaceholder ? displayRank(after,conditionalRank) : after;
+    if (measured(baseline) && measured(current)) {
+      const delta = baseline - current;
       const change = {kind:delta > 0 ? 'up' : delta < 0 ? 'down' : 'same',amount:Math.abs(delta)};
-      return usesConditional ? {...change,conditionalBefore} : change;
+      return baseline !== before || current !== after ? {...change,conditionalRank} : change;
     }
-    if (hasAfter && before === null) return {kind:'appeared',amount:null};
-    if (hasAfter && before === undefined) return {kind:'new',amount:null};
+    if (measured(after) && before === null) return {kind:'appeared',amount:null};
+    if (measured(after) && before === undefined) return {kind:'new',amount:null};
     if (measured(before) && after === null) return {kind:'lost',amount:null};
     return {kind:'no_data',amount:null};
   }
