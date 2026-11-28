@@ -67,16 +67,37 @@
     const stats = rankEngineStats(engine);
     const metric = stats['top' + top], total = stats.total;
     if (!total) return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><p class="no-metric">Нет данных</p></div>`;
-    const after = metric.after / total * 100, before = metric.before === null ? null : metric.before / total * 100;
-    const sameProfile = !summary || summary.comparisons[engine].comparable;
-    const trend = !sameProfile || before === null || after === before ? 'neutral' : after > before ? 'positive' : 'negative';
-    const baselineLabel = summary ? dateLabel(summary.before.date).slice(0,5) : 'Было';
-    const latestLabel = summary ? dateLabel(summary.after.date).slice(0,5) : 'Стало';
-    const arrow = sameProfile ? icon('arrow','kpi-arrow') : '';
-    return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><div class="kpi-values">${before === null ? '' : `<div><span class="kpi-period">${baselineLabel}</span><span class="number before">${number(metric.before)}</span></div>${arrow}`}<div>${before === null ? '' : `<span class="kpi-period">${latestLabel}</span>`}<span class="number ${trend}">${number(metric.after)}</span></div></div><p class="kpi-count">из ${number(total)} ${summary?'общих ':''}запросов · ${number(after)}%</p></div>`;
+    const share = number(metric.after / total * 100) + '%';
+    const delta = metric.after - metric.before;
+    const trend = metric.before === null || delta === 0 ? 'neutral' : delta > 0 ? 'positive' : 'negative';
+    if (summary) {
+      const baseline = summary.before.date, latest = summary.after.date;
+      return `<div class="engine-kpi-metric">
+        <h4>Топ-${top}</h4>
+        <div class="kpi-values kpi-values--dated">
+          <time class="kpi-period kpi-baseline-date" datetime="${baseline}">${trafficDate(baseline)}</time>
+          <span class="number before">${number(metric.before)}</span>
+          <time class="kpi-period kpi-latest-date" datetime="${latest}">${trafficDate(latest)}</time>
+          <div class="kpi-current">
+            <span class="number">${number(metric.after)}</span>
+            <span class="kpi-delta ${trend}" title="Разница между датами" aria-label="Разница между датами ${signed(delta)}">${signed(delta)}</span>
+          </div>
+        </div>
+        <p class="kpi-count">${share} запросов</p>
+      </div>`;
+    }
+    return `<div class="engine-kpi-metric"><h4>Топ-${top}</h4><div class="kpi-values">${metric.before === null ? '' : `<div><span class="kpi-period">Было</span><span class="number before">${number(metric.before)}</span></div>${icon('arrow','kpi-arrow')}`}<div>${metric.before === null ? '' : '<span class="kpi-period">Стало</span>'}<span class="number ${trend}">${number(metric.after)}</span></div></div><p class="kpi-count">из ${number(total)} запросов · ${share}</p></div>`;
   }
   function engineKpisHTML() {
-    return `<div class="engine-kpi-grid">${M.ENGINES.map(engine => `<section class="engine-kpi-card surface engine-${engine}" aria-labelledby="kpi-heading-${engine}"><h3 class="searcher-name" id="kpi-heading-${engine}">${engine==='yandex'?'Яндекс':'Google'}</h3><div class="engine-kpi-metrics">${[10,3].map(top=>kpiHTML(engine,top)).join('')}</div></section>`).join('')}</div>`;
+    const cards = M.ENGINES.map(engine => {
+      const name = engine === 'yandex' ? 'Яндекс' : 'Google';
+      const count = summary?.counts[engine].after.total;
+      const scope = count ? `<span class="engine-query-count">${number(count)} общих запросов</span>` : '';
+      const title = `<h3 class="searcher-name" id="kpi-heading-${engine}">${name}</h3>`;
+      const heading = summary ? `<div class="engine-kpi-heading">${title}${scope}</div>` : title;
+      return `<section class="engine-kpi-card surface engine-${engine}" aria-labelledby="kpi-heading-${engine}">${heading}<div class="engine-kpi-metrics">${[10,3].map(top=>kpiHTML(engine,top)).join('')}</div></section>`;
+    });
+    return `<div class="engine-kpi-grid${summary?' engine-kpi-grid--dated':''}">${cards.join('')}</div>`;
   }
   function rankCharts() {
     const archive = report.archive;
@@ -104,12 +125,12 @@
   const trafficPeriod = period => `${trafficDate(period.from)}–${trafficDate(period.to)}`;
   const signed = value => `${value>0?'+':value<0?'−':''}${number(Math.abs(value))}`;
   const visitCount = new Intl.PluralRules('ru-RU');
-  function trafficMetric(label, before, after, key, dated = false) {
+  function trafficMetric(label, before, after, key, compact = false) {
     const delta = after[key] - before[key];
     const percent = before[key] ? delta / before[key] * 100 : null;
-    const dates = dated ? `<small class="traffic-date-pair">${trafficPeriod(before)} → ${trafficPeriod(after)}</small>` : '';
     const unit = {one:'визит',few:'визита',many:'визитов'}[visitCount.select(Math.abs(delta))];
-    return `<div class="traffic-metric"><h4>${label}</h4><div class="traffic-totals"><span>${number(before[key])}</span>${icon('arrow')}<strong>${number(after[key])}</strong></div><p class="${delta>0?'positive':delta<0?'negative':'neutral'}">${percent===null?'Нет сопоставимой базы':signed(percent)+'%'}<span> · ${signed(delta)} ${unit}</span></p>${dates}</div>`;
+    const change = percent === null ? 'Нет сопоставимой базы' : signed(percent) + '%';
+    return `<div class="traffic-metric"><h4>${label}</h4><div class="traffic-totals"><span>${number(before[key])}</span>${icon('arrow')}<strong>${number(after[key])}</strong></div><p class="${delta>0?'positive':delta<0?'negative':'neutral'}"><strong class="traffic-delta-number">${change}</strong><span>${compact?'':' · '}${signed(delta)} ${unit}</span></p></div>`;
   }
   function trafficWeekText(week) {
     const split = Number.isInteger(week.google) ? ` · Google ${number(week.google)}` : '';
@@ -118,35 +139,44 @@
   function trafficChart(traffic, split) {
     const {weeks,forecast} = traffic;
     const estimated = forecast ? M.forecastVisits(forecast) : 0;
-    const width = 900, height = split ? 300 : 348;
-    const pad = {left:split?48:74,right:30,top:24,bottom:46};
+    const width = 900, height = split ? 300 : 200;
+    const pad = split ? {left:48,right:30,top:24,bottom:46} : {left:90,right:68,top:12,bottom:28};
     const max = Math.ceil(Math.max(1,estimated,...weeks.map(w=>w.total))/50)*50;
     const periods = forecast ? [...weeks,forecast] : weeks;
     const last = periods.length - 1;
     const x = i => pad.left + i * (width - pad.left - pad.right) / Math.max(1,last);
     const y = v => height - pad.bottom - v/max * (height-pad.top-pad.bottom);
+    const axisX = value => split ? value : `${value / width * 100}%`;
+    const axisY = value => split ? value : `${value / height * 100}%`;
     const coordinates = (i,value) => `${x(i)},${y(value)}`;
+    const viewBox = `0 0 ${width} ${height}`;
+    // In the compact chart, scale the line through its own viewport while
+    // keeping dots and text sized in CSS pixels for wide and narrow screens.
+    const plotLine = (key,coords) => {
+      const line = `<polyline class="traffic-line line-${key}" points="${coords}"${split?'':' vector-effect="non-scaling-stroke"'}></polyline>`;
+      return split ? line : `<svg viewBox="${viewBox}" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">${line}</svg>`;
+    };
     const names = {total:'Весь поиск',google:'Google'};
-    const point = (week,i,value,key,label) => `<circle class="traffic-point point-${key}" cx="${x(i)}" cy="${y(value)}" r="5" tabindex="0" role="img" data-traffic-week="${i}" aria-label="${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов"><title>${esc(label)} · ${number(value)} визитов</title></circle>`;
+    const point = (week,i,value,key,label) => `<circle class="traffic-point point-${key}" cx="${axisX(x(i))}" cy="${axisY(y(value))}" r="${split?5:3}" tabindex="0" role="img" data-traffic-week="${i}" aria-label="${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов"><title>${esc(label)} · ${trafficPeriod(week)} · ${number(value)} визитов</title></circle>`;
     const keys = split ? ['total','google'] : ['total'];
     const lines = keys.map(key => {
       const hidden = split && !state.trafficSeries.includes(key) ? ' hidden' : '';
       const coords = weeks.map((week,i)=>coordinates(i,week[key])).join(' ');
-      return `<g data-traffic-line="${key}"${hidden}><polyline class="traffic-line line-${key}" points="${coords}"></polyline>${weeks.map((week,i)=>point(week,i,week[key],key,names[key])).join('')}</g>`;
+      return `<g data-traffic-line="${key}"${hidden}>${plotLine(key,coords)}${weeks.map((week,i)=>point(week,i,week[key],key,names[key])).join('')}</g>`;
     }).join('');
-    const projection = forecast ? `<polyline class="traffic-line line-forecast" points="${coordinates(last-1,weeks.at(-1).total)} ${coordinates(last,estimated)}"></polyline>${point(forecast,last,estimated,'forecast','Прогноз')}` : '';
+    const projection = forecast ? plotLine('forecast', `${coordinates(last-1,weeks.at(-1).total)} ${coordinates(last,estimated)}`) + point(forecast,last,estimated,'forecast','Прогноз') : '';
     const grid = Array.from({length:6},(_,i)=>{
       const value = max*i/5;
-      return `<line class="traffic-gridline" x1="${pad.left}" x2="${width-pad.right}" y1="${y(value)}" y2="${y(value)}"></line><text class="traffic-axis-label" x="${pad.left-12}" y="${y(value)+5}" text-anchor="end">${number(value)}</text>`;
+      return `<line class="traffic-gridline" x1="${axisX(pad.left)}" x2="${axisX(width-pad.right)}" y1="${axisY(y(value))}" y2="${axisY(y(value))}"></line><text class="traffic-axis-label" x="${axisX(pad.left-10)}" y="${axisY(y(value))}" dy=".33em" text-anchor="end">${number(value)}</text>`;
     }).join('');
     const labelStep = split ? 4 : 5;
     const labels = periods.map((week,i)=>i===0 || i===last || (i%labelStep===0 && last-i>1)
-      ? `<text class="traffic-axis-label" x="${x(i)}" y="${height-12}" text-anchor="${i===0?'start':i===last?'end':'middle'}">${trafficDate(week.from)}</text>` : '').join('');
+      ? `<text class="traffic-axis-label" x="${axisX(x(i))}" y="${axisY(height-(split?12:7))}" text-anchor="${!split?'middle':i===0?'start':i===last?'end':'middle'}">${trafficDate(week.from)}</text>` : '').join('');
     const legend = split
       ? `<div class="traffic-series-switch" role="group" aria-label="Ряды недельного графика">${keys.map(key=>`<button type="button" data-traffic-series="${key}" aria-pressed="${state.trafficSeries.includes(key)}"><i class="series-key key-${key}" aria-hidden="true"></i>${names[key]}</button>`).join('')}</div>`
       : `<div class="traffic-legend"><span><i class="series-key" aria-hidden="true"></i>Факт</span>${forecast?'<span><i class="series-key key-forecast" aria-hidden="true"></i>Прогноз</span>':''}</div>`;
     const readout = split ? `<p class="traffic-point-readout" id="traffic-point-readout" aria-live="polite">${esc(trafficWeekText(periods.at(-1)))}</p>` : '';
-    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
+    return `<figure class="traffic-weekly-figure"><figcaption>Визиты из поиска по неделям</figcaption>${legend}<div class="traffic-chart-scroll" role="region" tabindex="0" aria-label="Недельный график поискового трафика"><svg class="traffic-weekly-chart"${split?` viewBox="${viewBox}"`:''} role="group" aria-label="Недельные визиты из поиска">${grid}${lines}${projection}${labels}</svg></div>${readout}</figure>`;
   }
   function trafficHTML() {
     const traffic = report.traffic;
@@ -154,7 +184,7 @@
     if (!traffic.periods || !traffic.weeks?.length) return `<section class="traffic-card surface"><div><h3>Поисковый трафик</h3><p class="traffic-value">${number(traffic.visits)}<span>визитов</span></p></div></section>`;
     const {baseline,before,after} = traffic.periods;
     const split = Number.isInteger(after.google);
-    const main = trafficMetric(baseline?'К первым четырём неделям июня':'Все поисковые системы',baseline||before,after,'total',!!baseline);
+    const main = trafficMetric(baseline?'К первым четырём неделям июня':'Все поисковые системы',baseline||before,after,'total',!split);
     const second = split ? trafficMetric('Google',before,after,'google') : '';
     const csv = M.safeHref(traffic.csv) ? `<p class="traffic-csv">${linkHTML({url:traffic.csv,label:'Скачать данные о поисковом трафике (CSV)'})}</p>` : '';
     return `<section class="traffic-card traffic-report${split?'':' traffic-total-only'} surface" aria-labelledby="traffic-heading"><div class="traffic-report-heading"><h3 id="traffic-heading">Поисковый трафик</h3></div><div class="traffic-metric-grid">${main}${second}</div>${trafficChart(traffic,split)}${csv}</section>`;
